@@ -4,6 +4,8 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+  repository_dispatch:
+    types: [corepedia-updated]
 
 permissions:
   contents: read
@@ -30,11 +32,38 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
+      - name: Create Corepedia read token
+        id: corepedia-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.COREPEDIA_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COREPEDIA_APP_PRIVATE_KEY }}
+          owner: Cypherrr0
+          repositories: corepedia
+          permission-contents: read
+
+      - name: Checkout Corepedia wiki
+        uses: actions/checkout@v4
+        with:
+          repository: Cypherrr0/corepedia
+          token: ${{ steps.corepedia-token.outputs.token }}
+          path: corepedia
+          sparse-checkout: wikis
+          persist-credentials: false
+
+      - name: Verify Corepedia content
+        run: |
+          test -f corepedia/wikis/index.md
+          find corepedia/wikis/tech corepedia/wikis/writing corepedia/wikis/learning \
+            -type f -name '*.md' -print -quit | grep -q .
+
       - name: Install dependencies
         run: npm ci --registry https://registry.npmjs.org --replace-registry-host always
 
       - name: Build static export
         run: npm run build
+        env:
+          COREPEDIA_WIKI_PATH: ${{ github.workspace }}/corepedia/wikis
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
