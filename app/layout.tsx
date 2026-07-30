@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Yunzhong Zhang",
-  description: "Personal website of Yunzhong Zhang.",
+  title: "Corepedia",
+  description: "A statically published view of the Corepedia LLM wiki.",
 };
 
 export default function RootLayout({
@@ -12,8 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="zh-CN">
+      <body>{children}</body>
     </html>
   );
 }

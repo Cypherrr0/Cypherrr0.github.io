@@ -1,40 +1,65 @@
-# Personal Website
+# Corepedia Website
 
-This repository contains a personal website built with Next.js App Router and prepared for deployment to GitHub Pages.
+This repository contains the presentation layer for the Corepedia LLM wiki. It
+owns routing, Markdown rendering, search, and GitHub Pages deployment. Wiki
+content stays in the separate `Cypherrr0/corepedia` repository.
+
+Only the maintained `tech`, `writing`, and `learning` sections are published.
+Raw sources, operation logs, ideas, and agent instructions are excluded by the
+website.
 
 ## Local Development
 
-Install dependencies and start the dev server:
+Install dependencies and point the website at a local Corepedia checkout:
 
 ```bash
-npm install
-npm run dev
+COREPEDIA_WIKI_PATH=../corepedia/wikis npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+If `COREPEDIA_WIKI_PATH` is unset, the application looks for
+`../corepedia/wikis` relative to this repository. If the directory is not
+available, the homepage still builds and shows a setup message.
 
 ## Production Build
 
-This project uses Next.js static export mode.
+Build all public wiki pages as static HTML:
 
 ```bash
-npm run build
+COREPEDIA_WIKI_PATH=../corepedia/wikis npm run build
 ```
 
-The exported static site will be generated in the `out/` directory.
+The exported site is generated in `out/`. The build supports:
 
-## GitHub Pages Deployment
+- YAML frontmatter metadata
+- CommonMark and GitHub Flavored Markdown
+- Obsidian `[[path|label]]` links between published pages
+- Static routes for every published Markdown file
+- Browser-side search over titles, tags, paths, and text
 
-This repository is configured for GitHub Pages deployment through GitHub Actions.
+The wiki remains responsible for content only. This repository decides how that
+content is routed and rendered.
 
-To enable publishing:
+## GitHub Pages
 
-1. Push this repository to a GitHub repository named `<username>.github.io`.
-2. In GitHub, open `Settings` -> `Pages`.
-3. Set `Source` to `GitHub Actions`.
-4. Push to the default branch and let the workflow deploy the `out/` directory.
+The existing workflow deploys the `out/` directory when the website repository
+changes. To build from the private Corepedia repository, extend that workflow
+with an authenticated checkout and set:
 
-## Notes
+```bash
+COREPEDIA_WIKI_PATH=/path/to/checked-out/corepedia/wikis
+```
 
-- This setup targets the root GitHub Pages domain, so no `basePath` is configured.
-- The current homepage is a placeholder and can be replaced later without changing the deployment setup.
+Repository credentials and cross-repository triggers are intentionally not
+configured in this codebase.
+
+## Standard Commands
+
+```bash
+npm ci
+npm run dev
+npm run build
+npm run lint
+```
+
+This site uses Next.js static export mode and targets the root GitHub Pages
+domain, so no `basePath` is configured.
