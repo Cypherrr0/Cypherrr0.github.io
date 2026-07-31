@@ -52,8 +52,15 @@ export type WikiPageSummary = {
   updated: string;
 };
 
+export type WikiOutlineItem = {
+  depth: number;
+  id: string;
+  title: string;
+};
+
 export type WikiPage = WikiPageSummary & {
   html: string;
+  outline: WikiOutlineItem[];
 };
 
 type WikiDocument = WikiPageSummary & {
@@ -142,13 +149,13 @@ export async function getWikiPageBySlug(
       documents.map((candidate) => candidate.slug.join("/")),
     ),
   };
-  const html = await renderMarkdown(
+  const { html, outline } = await renderMarkdown(
     document.markdown,
     document.path,
     linkContext,
   );
 
-  return { ...toPageSummary(document), html };
+  return { ...toPageSummary(document), html, outline };
 }
 
 function loadWikiDocuments(): WikiDocument[] {
@@ -578,7 +585,8 @@ async function renderMarkdown(
   markdown: string,
   documentPath: string,
   linkContext: WikiLinkContext,
-): Promise<string> {
+): Promise<{ html: string; outline: WikiOutlineItem[] }> {
+  const outline: WikiOutlineItem[] = [];
   const result = await unified()
     .use(remarkParse)
     .use(remarkGfm)
@@ -591,10 +599,41 @@ async function renderMarkdown(
     .use(linkMetadataPlugin())
     .use(mediaStatusPlugin())
     .use(rehypeSlug)
+    .use(outlinePlugin(outline))
     .use(rehypeStringify)
     .process(protectWikiLinkPipesInTables(markdown));
 
-  return String(result);
+  return { html: String(result), outline };
+}
+
+function outlinePlugin(
+  outline: WikiOutlineItem[],
+): Plugin<[], import("hast").Root> {
+  return () => (tree) => {
+    visit(tree, "element", (node) => {
+      const match = /^h([2-4])$/.exec(node.tagName);
+      const id = String(node.properties.id || "");
+      if (!match || !id) {
+        return;
+      }
+
+      outline.push({
+        depth: Number(match[1]),
+        id,
+        title: hastText(node).trim(),
+      });
+    });
+  };
+}
+
+function hastText(node: import("hast").ElementContent): string {
+  if (node.type === "text") {
+    return node.value;
+  }
+  if ("children" in node) {
+    return node.children.map(hastText).join("");
+  }
+  return "";
 }
 
 function localMediaPlugin(documentPath: string): Plugin<[], Root> {

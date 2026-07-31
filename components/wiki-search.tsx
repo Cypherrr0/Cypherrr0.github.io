@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { KnowledgeGraph } from "@/components/knowledge-graph";
 import type { WikiPageSummary } from "@/lib/wiki";
 
 type WikiSearchProps = {
@@ -11,7 +12,6 @@ type WikiSearchProps = {
 type WikiNode = {
   children: Map<string, WikiNode>;
   directPages: WikiPageSummary[];
-  indexPage?: WikiPageSummary;
   path: string[];
   segment: string;
 };
@@ -40,17 +40,24 @@ const DOMAIN_META: Record<
 
 export function WikiSearch({ pages }: WikiSearchProps) {
   const [query, setQuery] = useState("");
+  const [activeDomain, setActiveDomain] = useState("learning");
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
-  const domains = useMemo(() => buildWikiTree(pages), [pages]);
+  const visiblePages = useMemo(
+    () => pages.filter((page) => !isIndexPage(page)),
+    [pages],
+  );
+  const domains = useMemo(() => buildWikiTree(visiblePages), [visiblePages]);
   const results = useMemo(() => {
     if (!normalizedQuery) {
-      return pages;
+      return visiblePages;
     }
 
-    return pages.filter((page) =>
+    return visiblePages.filter((page) =>
       page.searchText.toLocaleLowerCase("zh-CN").includes(normalizedQuery),
     );
-  }, [normalizedQuery, pages]);
+  }, [normalizedQuery, visiblePages]);
+  const selectedDomain =
+    domains.find((domain) => domain.segment === activeDomain) || domains[0];
 
   return (
     <section aria-labelledby="wiki-pages" className="wiki-index">
@@ -61,7 +68,7 @@ export function WikiSearch({ pages }: WikiSearchProps) {
           <p aria-live="polite" className="muted">
             {normalizedQuery
               ? `找到 ${results.length} 个结果`
-              : `${domains.length} 个知识域，共 ${pages.length} 个公开页面`}
+              : `${domains.length} 个知识域，共 ${visiblePages.length} 个公开页面`}
           </p>
         </div>
         <label className="search">
@@ -89,22 +96,44 @@ export function WikiSearch({ pages }: WikiSearchProps) {
         )
       ) : (
         <>
-          <nav aria-label="知识域" className="domain-nav">
+          <KnowledgeGraph
+            activeDomain={selectedDomain?.segment || activeDomain}
+            pages={visiblePages}
+          />
+
+          <div aria-label="知识域" className="domain-nav" role="tablist">
             {domains.map((domain) => {
               const meta = domainMeta(domain.segment);
+              const isActive = domain.segment === selectedDomain?.segment;
               return (
-                <a href={`#domain-${domain.segment}`} key={domain.segment}>
+                <button
+                  aria-controls={`domain-panel-${domain.segment}`}
+                  aria-selected={isActive}
+                  className={isActive ? "is-active" : undefined}
+                  id={`domain-tab-${domain.segment}`}
+                  key={domain.segment}
+                  onKeyDown={(event) =>
+                    handleDomainKeyDown(
+                      event,
+                      domain.segment,
+                      domains,
+                      setActiveDomain,
+                    )
+                  }
+                  onClick={() => setActiveDomain(domain.segment)}
+                  role="tab"
+                  tabIndex={isActive ? 0 : -1}
+                  type="button"
+                >
                   <span>{meta.title}</span>
                   <small>{countPages(domain)}</small>
-                </a>
+                </button>
               );
             })}
-          </nav>
+          </div>
 
           <div className="domain-list">
-            {domains.map((domain) => (
-              <DomainSection key={domain.segment} node={domain} />
-            ))}
+            {selectedDomain ? <DomainSection node={selectedDomain} /> : null}
           </div>
         </>
       )}
@@ -116,17 +145,17 @@ function DomainSection({ node }: { node: WikiNode }) {
   const meta = domainMeta(node.segment);
 
   return (
-    <section className="domain-section" id={`domain-${node.segment}`}>
+    <section
+      aria-labelledby={`domain-tab-${node.segment}`}
+      className="domain-section"
+      id={`domain-panel-${node.segment}`}
+      role="tabpanel"
+      tabIndex={0}
+    >
       <header className="domain-header">
         <div>
           <p className="eyebrow">{meta.eyebrow}</p>
-          <h3>
-            {node.indexPage ? (
-              <PageLink page={node.indexPage}>{meta.title}</PageLink>
-            ) : (
-              meta.title
-            )}
-          </h3>
+          <h3>{meta.title}</h3>
           <p>{meta.description}</p>
         </div>
         <span className="page-count">{countPages(node)} 页</span>
@@ -145,19 +174,13 @@ function DomainSection({ node }: { node: WikiNode }) {
 }
 
 function TopicSection({ depth, node }: { depth: number; node: WikiNode }) {
-  const title = node.indexPage?.title || formatSegment(node.segment);
+  const title = formatSegment(node.segment);
   const Heading = depth === 1 ? "h4" : "h5";
 
   return (
     <section className={`topic-section topic-depth-${depth}`}>
       <header className="topic-header">
-        <Heading>
-          {node.indexPage ? (
-            <PageLink page={node.indexPage}>{title}</PageLink>
-          ) : (
-            title
-          )}
-        </Heading>
+        <Heading>{title}</Heading>
         <span>{countPages(node)} 页</span>
       </header>
       {node.directPages.length ? <PageLinkList pages={node.directPages} /> : null}
@@ -175,20 +198,46 @@ function PageLinkList({
   pages: WikiPageSummary[];
   title?: string;
 }) {
+  const visiblePages = pages.slice(0, 3);
+  const hiddenPages = pages.slice(3);
+
   return (
     <div className="topic-pages">
       {title ? <p className="topic-label">{title}</p> : null}
       <ul>
-        {pages.map((page) => (
+        {visiblePages.map((page) => (
           <li key={page.path}>
-            <PageLink page={page}>{page.title}</PageLink>
-            {page.updated ? (
-              <time dateTime={page.updated}>{page.updated}</time>
-            ) : null}
+            <PageListItem page={page} />
           </li>
         ))}
       </ul>
+      {hiddenPages.length ? (
+        <details className="topic-pages-more">
+          <summary>
+            <span className="show-more-label">展开 {hiddenPages.length} 项</span>
+            <span className="show-less-label">收起</span>
+          </summary>
+          <ul>
+            {hiddenPages.map((page) => (
+              <li key={page.path}>
+                <PageListItem page={page} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
+  );
+}
+
+function PageListItem({ page }: { page: WikiPageSummary }) {
+  return (
+    <>
+      <PageLink page={page}>{page.title}</PageLink>
+      {page.updated ? (
+        <time dateTime={page.updated}>{page.updated}</time>
+      ) : null}
+    </>
   );
 }
 
@@ -236,19 +285,14 @@ function buildWikiTree(pages: WikiPageSummary[]): WikiNode[] {
     }
 
     const root = getOrCreateNode(roots, domain, []);
-    const isIndex = page.path.endsWith("/index.md");
-    const directorySegments = isIndex ? rest : rest.slice(0, -1);
+    const directorySegments = rest.slice(0, -1);
     let node = root;
 
     for (const segment of directorySegments) {
       node = getOrCreateNode(node.children, segment, node.path);
     }
 
-    if (isIndex) {
-      node.indexPage = page;
-    } else {
-      node.directPages.push(page);
-    }
+    node.directPages.push(page);
   }
 
   return [...roots.values()].sort((left, right) => {
@@ -285,7 +329,6 @@ function getOrCreateNode(
 function countPages(node: WikiNode): number {
   return (
     node.directPages.length +
-    (node.indexPage ? 1 : 0) +
     [...node.children.values()].reduce(
       (total, child) => total + countPages(child),
       0,
@@ -295,9 +338,7 @@ function countPages(node: WikiNode): number {
 
 function sortedChildren(node: WikiNode): WikiNode[] {
   return [...node.children.values()].sort((left, right) => {
-    const leftTitle = left.indexPage?.title || left.segment;
-    const rightTitle = right.indexPage?.title || right.segment;
-    return leftTitle.localeCompare(rightTitle, "zh-CN");
+    return left.segment.localeCompare(right.segment, "zh-CN");
   });
 }
 
@@ -316,4 +357,37 @@ function formatSegment(segment: string): string {
     .split("-")
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
     .join(" ");
+}
+
+function isIndexPage(page: WikiPageSummary) {
+  return page.path.endsWith("/index.md");
+}
+
+function handleDomainKeyDown(
+  event: React.KeyboardEvent<HTMLButtonElement>,
+  currentDomain: string,
+  domains: WikiNode[],
+  selectDomain: (domain: string) => void,
+) {
+  const currentIndex = domains.findIndex(
+    (domain) => domain.segment === currentDomain,
+  );
+  let nextIndex = currentIndex;
+
+  if (event.key === "ArrowRight") {
+    nextIndex = (currentIndex + 1) % domains.length;
+  } else if (event.key === "ArrowLeft") {
+    nextIndex = (currentIndex - 1 + domains.length) % domains.length;
+  } else if (event.key === "Home") {
+    nextIndex = 0;
+  } else if (event.key === "End") {
+    nextIndex = domains.length - 1;
+  } else {
+    return;
+  }
+
+  event.preventDefault();
+  const nextDomain = domains[nextIndex];
+  selectDomain(nextDomain.segment);
+  document.getElementById(`domain-tab-${nextDomain.segment}`)?.focus();
 }

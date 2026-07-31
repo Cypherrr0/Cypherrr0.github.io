@@ -37,6 +37,8 @@ The exported site is generated in `out/`. The build supports:
 - Content-hashed static images referenced by published pages
 - Static routes for every published Markdown file
 - Browser-side search over titles, tags, paths, and text
+- Single-domain browsing with collapsible topic lists
+- Markdown-derived article outlines and a reduced-motion-aware knowledge graph
 
 The wiki remains responsible for content only. This repository decides how that
 content is routed and rendered. Local images are published only when a maintained

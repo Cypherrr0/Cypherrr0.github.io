@@ -120,19 +120,6 @@ code {
   margin: 1.5rem 0 3rem;
 }
 
-.domain-nav a {
-  align-items: center;
-  border: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  padding: 0.85rem 1rem;
-  text-decoration: none;
-}
-
-.domain-nav a:hover {
-  background: var(--surface);
-}
-
 .domain-nav span {
   font-weight: 700;
 }

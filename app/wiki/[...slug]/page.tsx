@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArticleOutline } from "@/components/article-outline";
 import { getWikiPageBySlug, getWikiPages } from "@/lib/wiki";
 
 export const dynamicParams = false;
@@ -112,10 +113,13 @@ export default async function WikiPage({ params }: WikiPageProps) {
               <time dateTime={page.updated}>{page.updated}</time>
             ) : null}
           </aside>
-          <div
-            className="wiki-content"
-            dangerouslySetInnerHTML={{ __html: page.html }}
-          />
+          <div className="article-main">
+            <ArticleOutline items={page.outline} />
+            <div
+              className="wiki-content"
+              dangerouslySetInnerHTML={{ __html: page.html }}
+            />
+          </div>
         </div>
       </article>
     </main>

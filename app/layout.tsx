@@ -17,6 +17,10 @@ const anthropicSerifDisplay = localFont({
   ],
   src: [
     {
+      path: "./fonts/anthropic-serif-display-light.otf",
+      weight: "300",
+    },
+    {
       path: "./fonts/anthropic-serif-display-regular.otf",
       weight: "400",
     },

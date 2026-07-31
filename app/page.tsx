@@ -4,6 +4,9 @@ import { getWikiPages } from "@/lib/wiki";
 
 export default function Home() {
   const pages = getWikiPages();
+  const publicNotes = pages.filter(
+    (page) => !page.path.endsWith("/index.md"),
+  ).length;
 
   return (
     <main className="home-shell" id="main-content" tabIndex={-1}>
@@ -39,7 +42,7 @@ export default function Home() {
           <span aria-hidden="true">→</span>
         </Link>
         <p>
-          <span>{pages.length || "—"}</span>
+          <span>{publicNotes}</span>
           <span>public notes</span>
         </p>
       </footer>
