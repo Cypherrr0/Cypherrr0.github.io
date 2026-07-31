@@ -1,9 +1,63 @@
 import type { Metadata } from "next";
 import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import localFont from "next/font/local";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import "./redesign.css";
+
+const anthropicSerifDisplay = localFont({
+  adjustFontFallback: false,
+  display: "swap",
+  fallback: [
+    "PingFang SC",
+    "-apple-system",
+    "BlinkMacSystemFont",
+    "system-ui",
+    "sans-serif",
+  ],
+  src: [
+    {
+      path: "./fonts/anthropic-serif-display-regular.otf",
+      weight: "400",
+    },
+    {
+      path: "./fonts/anthropic-serif-display-medium.otf",
+      weight: "500",
+    },
+    {
+      path: "./fonts/anthropic-serif-display-semibold.otf",
+      weight: "600",
+    },
+  ],
+  variable: "--font-anthropic-serif-display",
+});
+
+const anthropicSerifText = localFont({
+  adjustFontFallback: false,
+  display: "swap",
+  fallback: [
+    "PingFang SC",
+    "-apple-system",
+    "BlinkMacSystemFont",
+    "system-ui",
+    "sans-serif",
+  ],
+  src: [
+    {
+      path: "./fonts/anthropic-serif-text-regular.otf",
+      weight: "400",
+    },
+    {
+      path: "./fonts/anthropic-serif-text-medium.otf",
+      weight: "500",
+    },
+    {
+      path: "./fonts/anthropic-serif-text-semibold.otf",
+      weight: "600",
+    },
+  ],
+  variable: "--font-anthropic-serif-text",
+});
 
 export const metadata: Metadata = {
   description: "No coding, thoughts only. A quiet entrance to Corepedia.",
@@ -20,7 +74,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      className={`${anthropicSerifDisplay.variable} ${anthropicSerifText.variable} ${GeistMono.variable}`}
       lang="zh-CN"
     >
       <body>

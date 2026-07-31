@@ -16,10 +16,13 @@ export function RollingWords() {
         <span className="rolling-words-track">
           {[...WORDS, WORDS[0]].map((word, index) => (
             <span className="rolling-word" key={`${word}-${index}`}>
-              {word} only
+              {word}
             </span>
           ))}
         </span>
+      </span>
+      <span aria-hidden="true" className="rolling-words-suffix">
+        only
       </span>
     </span>
   );

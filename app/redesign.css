@@ -23,9 +23,7 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family:
-    var(--font-geist-sans), "Noto Sans CJK SC", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+  font-family: var(--font-anthropic-serif-text);
   font-size: 1rem;
   line-height: 1.65;
   text-rendering: optimizeLegibility;
@@ -175,10 +173,11 @@ code {
 }
 
 .home-hero h1 {
+  font-family: var(--font-anthropic-serif-display);
   font-size: clamp(2.85rem, 9.2vw, 8rem);
-  font-weight: 520;
-  letter-spacing: -0.072em;
-  line-height: 0.91;
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.94;
   margin: 0;
   max-width: 12ch;
   text-wrap: balance;
@@ -188,8 +187,12 @@ code {
   display: block;
 }
 
-.rolling-words {
-  display: block;
+.home-hero h1 > .rolling-words {
+  align-items: baseline;
+  display: grid;
+  gap: 0.18em;
+  grid-template-columns: 6.55ch auto;
+  justify-content: start;
   max-width: 100%;
 }
 
@@ -200,7 +203,7 @@ code {
 }
 
 .rolling-words-track {
-  animation: roll-words 16s infinite var(--ease-out);
+  animation: roll-words 28s infinite var(--ease-out);
   display: block;
   will-change: transform;
 }
@@ -208,39 +211,43 @@ code {
 .rolling-word {
   display: block;
   height: 0.96em;
+  text-align: right;
   white-space: nowrap;
+}
+
+.rolling-words-suffix {
+  display: block;
 }
 
 @keyframes roll-words {
   0%,
-  10% {
+  11% {
     transform: translateY(0);
   }
-  12.5%,
-  22.5% {
+  14.285%,
+  25.285% {
     transform: translateY(-0.96em);
   }
-  25%,
-  35% {
+  28.57%,
+  39.57% {
     transform: translateY(-1.92em);
   }
-  37.5%,
-  47.5% {
+  42.855%,
+  53.855% {
     transform: translateY(-2.88em);
   }
-  50%,
-  60% {
+  57.14%,
+  68.14% {
     transform: translateY(-3.84em);
   }
-  62.5%,
-  72.5% {
+  71.425%,
+  82.425% {
     transform: translateY(-4.8em);
   }
-  75%,
-  85% {
+  85.71%,
+  96.71% {
     transform: translateY(-5.76em);
   }
-  87.5%,
   100% {
     transform: translateY(-6.72em);
   }
@@ -315,8 +322,9 @@ code {
 }
 
 .wiki-hero h1 {
+  font-family: var(--font-anthropic-serif-display);
   font-size: clamp(3.1rem, 7vw, 7.2rem);
-  font-weight: 520;
+  font-weight: 500;
   grid-column: 2;
   letter-spacing: -0.068em;
   line-height: 0.95;
@@ -353,8 +361,9 @@ code {
 }
 
 .search-row h2 {
+  font-family: var(--font-anthropic-serif-display);
   font-size: clamp(1.9rem, 3vw, 2.8rem);
-  font-weight: 520;
+  font-weight: 500;
   letter-spacing: -0.045em;
   line-height: 1.05;
   margin: 0.75rem 0 0;
@@ -483,8 +492,9 @@ code {
 }
 
 .domain-header h3 {
+  font-family: var(--font-anthropic-serif-display);
   font-size: clamp(2rem, 4vw, 3.6rem);
-  font-weight: 520;
+  font-weight: 500;
   letter-spacing: -0.055em;
   line-height: 1;
   margin: 0;
@@ -536,7 +546,8 @@ code {
 
 .topic-header h4,
 .topic-header h5 {
-  font-weight: 520;
+  font-family: var(--font-anthropic-serif-display);
+  font-weight: 500;
   letter-spacing: -0.025em;
   line-height: 1.25;
   margin: 0;
@@ -625,8 +636,9 @@ code {
 }
 
 .page-card h3 {
+  font-family: var(--font-anthropic-serif-display);
   font-size: clamp(1.35rem, 2.2vw, 1.8rem);
-  font-weight: 520;
+  font-weight: 500;
   letter-spacing: -0.035em;
   line-height: 1.2;
   margin: 0.45rem 0 0;
@@ -661,8 +673,9 @@ code {
 
 .empty-state h1,
 .empty-state h2 {
+  font-family: var(--font-anthropic-serif-display);
   font-size: 1.6rem;
-  font-weight: 520;
+  font-weight: 500;
   letter-spacing: -0.035em;
   margin-top: 0;
 }
@@ -710,10 +723,11 @@ code {
 }
 
 .article-header h1 {
+  font-family: var(--font-anthropic-serif-display);
   font-size: clamp(2.6rem, 6vw, 6.2rem);
-  font-weight: 520;
-  letter-spacing: -0.065em;
-  line-height: 0.98;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1;
   margin: 0;
   max-width: 14ch;
   text-wrap: balance;
@@ -783,7 +797,8 @@ code {
 .wiki-content h2,
 .wiki-content h3,
 .wiki-content h4 {
-  font-weight: 560;
+  font-family: var(--font-anthropic-serif-display);
+  font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1.25;
   scroll-margin-top: 2rem;
