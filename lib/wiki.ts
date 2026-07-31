@@ -1,12 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
-import type {
-  Link,
-  PhrasingContent,
-  Root,
-  Text,
-} from "mdast";
+import type { Link, PhrasingContent, Root, Text } from "mdast";
 import type { InlineMath, Math } from "mdast-util-math";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
@@ -49,6 +44,19 @@ type WikiDocument = WikiPageSummary & {
   markdown: string;
 };
 
+type WikiLinkContext = {
+  allTargets: Set<string>;
+  externalSources: Map<string, string>;
+  publishedRoutes: Set<string>;
+};
+
+type WikiLinkCatalog = Pick<
+  WikiLinkContext,
+  "allTargets" | "externalSources"
+>;
+
+const wikiLinkCatalogCache = new Map<string, WikiLinkCatalog>();
+
 export function getWikiRoot(): string {
   const configuredPath = process.env.COREPEDIA_WIKI_PATH?.trim();
 
@@ -72,10 +80,13 @@ export async function getWikiPageBySlug(
     return null;
   }
 
-  const publishedRoutes = new Set(
-    documents.map((candidate) => candidate.slug.join("/")),
-  );
-  const html = await renderMarkdown(document.markdown, publishedRoutes);
+  const linkContext: WikiLinkContext = {
+    ...getWikiLinkCatalog(),
+    publishedRoutes: new Set(
+      documents.map((candidate) => candidate.slug.join("/")),
+    ),
+  };
+  const html = await renderMarkdown(document.markdown, linkContext);
 
   return { ...toPageSummary(document), html };
 }
@@ -134,6 +145,83 @@ function readMarkdownFiles(directory: string): string[] {
   });
 }
 
+function getWikiLinkCatalog(): WikiLinkCatalog {
+  const wikiRoot = getWikiRoot();
+  const cached = wikiLinkCatalogCache.get(wikiRoot);
+  if (cached) {
+    return cached;
+  }
+  if (!existsSync(wikiRoot)) {
+    return {
+      allTargets: new Set(),
+      externalSources: new Map(),
+    };
+  }
+
+  const allTargets = new Set<string>();
+  const externalSources = new Map<string, string>();
+
+  for (const filePath of readMarkdownFiles(wikiRoot)) {
+    const relativePath = path
+      .relative(wikiRoot, filePath)
+      .split(path.sep)
+      .join("/");
+    const target = wikiTargetForPath(relativePath);
+    allTargets.add(target);
+
+    if (target.startsWith("sources/")) {
+      const metadata = matter(readFileSync(filePath, "utf8")).data;
+      const sourceUrl = publicSourceUrl(metadata);
+      if (sourceUrl) {
+        externalSources.set(target, sourceUrl);
+      }
+    }
+  }
+
+  const catalog = { allTargets, externalSources };
+  wikiLinkCatalogCache.set(wikiRoot, catalog);
+  return catalog;
+}
+
+function publicSourceUrl(metadata: Record<string, unknown>): string | null {
+  for (const field of [
+    "source_url",
+    "original_url",
+    "source_html",
+    "source_pdf",
+  ]) {
+    const value = metadata[field];
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    try {
+      const url = new URL(value);
+      if (
+        (url.protocol === "http:" || url.protocol === "https:") &&
+        !isPrivateSourceHost(url.hostname)
+      ) {
+        return url.toString();
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
+function isPrivateSourceHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return [
+    "bytedance.com",
+    "bytedance.net",
+    "byted.org",
+    "doubao.com",
+    "feishu.cn",
+    "larksuite.com",
+    "larkoffice.com",
+  ].some((domain) => host === domain || host.endsWith(`.${domain}`));
+}
+
 function parseWikiDocument(
   wikiRoot: string,
   filePath: string,
@@ -166,6 +254,10 @@ function parseWikiDocument(
 }
 
 function routeSlugForPath(relativePath: string): string[] {
+  return wikiTargetForPath(relativePath).split("/");
+}
+
+function wikiTargetForPath(relativePath: string): string {
   const withoutExtension = relativePath.replace(/\.md$/i, "");
   const segments = withoutExtension.split("/");
 
@@ -173,7 +265,7 @@ function routeSlugForPath(relativePath: string): string[] {
     segments.pop();
   }
 
-  return segments;
+  return segments.join("/");
 }
 
 function normalizeWikiTarget(target: string): string | null {
@@ -194,16 +286,16 @@ function normalizeWikiTarget(target: string): string | null {
   return normalized;
 }
 
-function wikiLinkPlugin(publishedRoutes: Set<string>): Plugin<[], Root> {
+function wikiLinkPlugin(linkContext: WikiLinkContext): Plugin<[], Root> {
   return () => (tree) => {
     visit(tree, "text", (node, index, parent) => {
       if (typeof index !== "number" || !parent) {
         return;
       }
 
-      const replacements = replaceWikiLinks(node, publishedRoutes);
+      const replacements = replaceWikiLinks(node, linkContext);
 
-      if (replacements.length === 1 && replacements[0].type === "text") {
+      if (replacements.length === 1 && replacements[0] === node) {
         return;
       }
 
@@ -342,7 +434,7 @@ const GREEK_TO_LATEX: Record<string, string> = {
 
 function replaceWikiLinks(
   node: Text,
-  publishedRoutes: Set<string>,
+  linkContext: WikiLinkContext,
 ): PhrasingContent[] {
   const replacements: PhrasingContent[] = [];
   let cursor = 0;
@@ -362,15 +454,54 @@ function replaceWikiLinks(
     const label = match[3]?.trim() || target?.split("/").at(-1) || match[1];
     const isEmbed = match[0].startsWith("!");
 
-    if (!isEmbed && target && publishedRoutes.has(target)) {
+    if (!isEmbed && target && linkContext.publishedRoutes.has(target)) {
       const link: Link = {
         children: [{ type: "text", value: label }],
+        data: {
+          hProperties: {
+            className: ["wiki-link", "wiki-link-internal"],
+            title: `内部页面：${target}`,
+          },
+        },
         type: "link",
         url: `/wiki/${target}/${heading ? `#${headingToId(heading)}` : ""}`,
       };
       replacements.push(link);
+    } else if (
+      !isEmbed &&
+      target &&
+      linkContext.externalSources.has(target)
+    ) {
+      const link: Link = {
+        children: [{ type: "text", value: label }],
+        data: {
+          hProperties: {
+            className: ["wiki-link", "wiki-link-source"],
+            title: `原始来源：${target}`,
+          },
+        },
+        type: "link",
+        url: linkContext.externalSources.get(target) as string,
+      };
+      replacements.push(link);
     } else {
-      replacements.push({ type: "text", value: label });
+      const exists = Boolean(target && linkContext.allTargets.has(target));
+      replacements.push({
+        data: {
+          hName: "span",
+          hProperties: {
+            className: [
+              "wiki-link-status",
+              exists ? "wiki-link-unpublished" : "wiki-link-missing",
+            ],
+            title: exists
+              ? `页面存在，但未在公开网站发布：${target}`
+              : `Wiki 中未找到目标：${target || match[1]}`,
+          },
+        },
+        type: "text",
+        value: label,
+      });
     }
 
     cursor = offset + match[0].length;
@@ -385,21 +516,131 @@ function replaceWikiLinks(
 
 async function renderMarkdown(
   markdown: string,
-  publishedRoutes: Set<string>,
+  linkContext: WikiLinkContext,
 ): Promise<string> {
   const result = await unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkMath)
     .use(formulaCodePlugin())
-    .use(wikiLinkPlugin(publishedRoutes))
+    .use(wikiLinkPlugin(linkContext))
     .use(remarkRehype)
     .use(rehypeKatex)
+    .use(linkMetadataPlugin())
+    .use(mediaStatusPlugin())
     .use(rehypeSlug)
     .use(rehypeStringify)
-    .process(markdown);
+    .process(protectWikiLinkPipesInTables(markdown));
 
   return String(result);
+}
+
+function protectWikiLinkPipesInTables(markdown: string): string {
+  let inFence = false;
+
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (/^\s*```/.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence || !/^\s*\|.*\|\s*$/.test(line)) {
+        return line;
+      }
+
+      return line.replace(
+        /(!?\[\[[^\]\n|]+)\|([^\]\n]+\]\])/g,
+        "$1\\|$2",
+      );
+    })
+    .join("\n");
+}
+
+function linkMetadataPlugin(): Plugin<[], import("hast").Root> {
+  return () => (tree) => {
+    visit(tree, "element", (node, index, parent) => {
+      if (node.tagName !== "a") {
+        return;
+      }
+
+      const href = String(node.properties.href || "");
+      const classes = Array.isArray(node.properties.className)
+        ? node.properties.className.map(String)
+        : [];
+
+      if (isPrivateHref(href) && typeof index === "number" && parent) {
+        let hostname = "内部文档";
+        try {
+          hostname = new URL(href).hostname;
+        } catch {}
+        parent.children.splice(index, 1, {
+          type: "element",
+          tagName: "span",
+          properties: {
+            className: ["wiki-link-status", "wiki-link-private"],
+            title: "内部链接未在公开网站开放",
+          },
+          children: [{ type: "text", value: hostname }],
+        });
+        return;
+      }
+
+      if (!classes.includes("wiki-link")) {
+        classes.push("wiki-link");
+      }
+      if (/^https?:\/\//.test(href)) {
+        classes.push("wiki-link-external");
+        node.properties.target = "_blank";
+        node.properties.rel = ["noopener", "noreferrer"];
+        node.properties.title ||= "外部链接（新窗口打开）";
+      } else if (href.startsWith("/") || href.startsWith("#")) {
+        classes.push("wiki-link-internal");
+        node.properties.title ||= "站内链接";
+      }
+
+      node.properties.className = [...new Set(classes)];
+    });
+  };
+}
+
+function isPrivateHref(href: string): boolean {
+  try {
+    return isPrivateSourceHost(new URL(href).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function mediaStatusPlugin(): Plugin<[], import("hast").Root> {
+  return () => (tree) => {
+    visit(tree, "element", (node, index, parent) => {
+      if (
+        node.tagName !== "img" ||
+        typeof index !== "number" ||
+        !parent ||
+        !("children" in parent)
+      ) {
+        return;
+      }
+
+      const source = String(node.properties.src || "");
+      if (/^(?:https?:|data:)/.test(source)) {
+        return;
+      }
+
+      const label = String(node.properties.alt || "图片");
+      parent.children.splice(index, 1, {
+        type: "element",
+        tagName: "span",
+        properties: {
+          className: ["wiki-media-status", "wiki-media-unavailable"],
+          title: `图片资源未发布：${source}`,
+        },
+        children: [{ type: "text", value: label }],
+      });
+    });
+  };
 }
 
 function markdownToSearchText(markdown: string): string {

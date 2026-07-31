@@ -4,6 +4,7 @@
   --background: #ffffff;
   --border: #d9d9d9;
   --foreground: #161616;
+  --link: #0759b8;
   --muted: #666666;
   --surface: #f6f6f6;
 }
@@ -414,6 +415,98 @@ code {
 .wiki-content .katex-display > .katex {
   text-align: left;
   white-space: nowrap;
+}
+
+.wiki-content .wiki-link {
+  color: var(--link);
+  font-weight: 600;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.wiki-content .wiki-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.wiki-content .wiki-link:focus-visible {
+  border-radius: 0.15rem;
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.wiki-content .wiki-link-internal::before {
+  content: "→";
+  display: inline-block;
+  font-size: 0.72em;
+  margin-right: 0.28em;
+  text-decoration: none;
+}
+
+.wiki-content .wiki-link-external::after {
+  content: " ↗";
+  display: inline-block;
+  font-size: 0.78em;
+  text-decoration: none;
+}
+
+.wiki-content .wiki-link-source::after {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  content: "原文 ↗";
+  display: inline-block;
+  font-size: 0.68em;
+  line-height: 1.25;
+  margin-left: 0.45em;
+  padding: 0.08em 0.42em;
+  text-decoration: none;
+  vertical-align: 0.08em;
+}
+
+.wiki-content .wiki-link-status {
+  border-bottom: 1px dotted currentColor;
+  color: var(--muted);
+}
+
+.wiki-content .wiki-link-status::after {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.68em;
+  line-height: 1.25;
+  margin-left: 0.45em;
+  padding: 0.08em 0.42em;
+  vertical-align: 0.08em;
+}
+
+.wiki-content .wiki-link-unpublished::after {
+  content: "未公开";
+}
+
+.wiki-content .wiki-link-missing {
+  color: #9b2c2c;
+}
+
+.wiki-content .wiki-link-missing::after {
+  border-color: currentColor;
+  content: "缺失";
+}
+
+.wiki-content .wiki-link-private::after {
+  content: "内部";
+}
+
+.wiki-content .wiki-media-status {
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  display: inline-block;
+  font-size: 0.9em;
+  padding: 0.35rem 0.55rem;
+}
+
+.wiki-content .wiki-media-unavailable::before {
+  content: "图片未发布 · ";
+  font-weight: 700;
 }
 
 .wiki-content table {
