@@ -857,6 +857,14 @@ code {
   padding: 0;
 }
 
+.wiki-content img {
+  display: block;
+  height: auto;
+  margin: 2rem 0;
+  max-width: 100%;
+  width: auto;
+}
+
 .wiki-content .wiki-link {
   color: var(--foreground);
   font-weight: 560;

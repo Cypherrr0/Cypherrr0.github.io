@@ -1,7 +1,14 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
-import type { Link, PhrasingContent, Root, Text } from "mdast";
+import type { Image, Link, PhrasingContent, Root, Text } from "mdast";
 import type { InlineMath, Math } from "mdast-util-math";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
@@ -23,6 +30,15 @@ const SUBSCRIPT_OR_SUPERSCRIPT_PATTERN =
   /(?:[A-Za-z0-9)}\]])(?:_(?:[A-Za-z0-9]+|\{[^{}]+\})|\^(?:[A-Za-z0-9*+-]+|\{[^{}]+\}))/;
 const MATH_OPERATOR_PATTERN = /(?:=|≈|≠|≤|≥|∑|∏|∫|√|∞|→|←|∝|±|×|·)/u;
 const VARIABLE_TOKEN_PATTERN = /\b[A-Za-z][A-Za-z0-9]*\b/g;
+const PUBLIC_MEDIA_TYPES = new Map([
+  [".avif", "image/avif"],
+  [".gif", "image/gif"],
+  [".jpeg", "image/jpeg"],
+  [".jpg", "image/jpeg"],
+  [".png", "image/png"],
+  [".svg", "image/svg+xml"],
+  [".webp", "image/webp"],
+]);
 
 export type WikiPageSummary = {
   excerpt: string;
@@ -55,7 +71,15 @@ type WikiLinkCatalog = Pick<
   "allTargets" | "externalSources"
 >;
 
+export type WikiMediaAsset = {
+  contentType: string;
+  fileName: string;
+  filePath: string;
+  publicPath: string;
+};
+
 const wikiLinkCatalogCache = new Map<string, WikiLinkCatalog>();
+const wikiMediaCatalogCache = new Map<string, WikiMediaAsset[]>();
 
 export function getWikiRoot(): string {
   const configuredPath = process.env.COREPEDIA_WIKI_PATH?.trim();
@@ -67,6 +91,38 @@ export function getWikiRoot(): string {
 
 export function getWikiPages(): WikiPageSummary[] {
   return loadWikiDocuments().map(toPageSummary);
+}
+
+export function getWikiMediaAssets(): WikiMediaAsset[] {
+  const wikiRoot = getWikiRoot();
+  const cached = wikiMediaCatalogCache.get(wikiRoot);
+  if (cached) {
+    return cached;
+  }
+
+  const assets = new Map<string, WikiMediaAsset>();
+
+  for (const document of loadWikiDocuments()) {
+    const tree = unified().use(remarkParse).parse(document.markdown);
+    visit(tree, "image", (node: Image) => {
+      const asset = resolveWikiMediaAsset(document.path, node.url);
+      if (asset) {
+        assets.set(asset.fileName, asset);
+      }
+    });
+  }
+
+  const catalog = [...assets.values()].sort((left, right) =>
+    left.fileName.localeCompare(right.fileName),
+  );
+  wikiMediaCatalogCache.set(wikiRoot, catalog);
+  return catalog;
+}
+
+export function getWikiMediaAsset(fileName: string): WikiMediaAsset | null {
+  return (
+    getWikiMediaAssets().find((asset) => asset.fileName === fileName) ?? null
+  );
 }
 
 export async function getWikiPageBySlug(
@@ -86,7 +142,11 @@ export async function getWikiPageBySlug(
       documents.map((candidate) => candidate.slug.join("/")),
     ),
   };
-  const html = await renderMarkdown(document.markdown, linkContext);
+  const html = await renderMarkdown(
+    document.markdown,
+    document.path,
+    linkContext,
+  );
 
   return { ...toPageSummary(document), html };
 }
@@ -516,6 +576,7 @@ function replaceWikiLinks(
 
 async function renderMarkdown(
   markdown: string,
+  documentPath: string,
   linkContext: WikiLinkContext,
 ): Promise<string> {
   const result = await unified()
@@ -524,6 +585,7 @@ async function renderMarkdown(
     .use(remarkMath)
     .use(formulaCodePlugin())
     .use(wikiLinkPlugin(linkContext))
+    .use(localMediaPlugin(documentPath))
     .use(remarkRehype)
     .use(rehypeKatex)
     .use(linkMetadataPlugin())
@@ -533,6 +595,88 @@ async function renderMarkdown(
     .process(protectWikiLinkPipesInTables(markdown));
 
   return String(result);
+}
+
+function localMediaPlugin(documentPath: string): Plugin<[], Root> {
+  return () => (tree) => {
+    visit(tree, "image", (node: Image) => {
+      const asset = resolveWikiMediaAsset(documentPath, node.url);
+      if (asset) {
+        node.url = asset.publicPath;
+      }
+    });
+  };
+}
+
+function resolveWikiMediaAsset(
+  documentPath: string,
+  source: string,
+): WikiMediaAsset | null {
+  const normalizedSource = source.trim();
+  if (
+    !normalizedSource ||
+    /^(?:[a-z][a-z\d+.-]*:|\/\/|\/)/i.test(normalizedSource)
+  ) {
+    return null;
+  }
+
+  const sourcePath = normalizedSource.split(/[?#]/, 1)[0];
+  let decodedPath: string;
+  try {
+    decodedPath = decodeURIComponent(sourcePath);
+  } catch {
+    return null;
+  }
+
+  const wikiRoot = realpathSync(getWikiRoot());
+  const documentFilePath = path.resolve(wikiRoot, documentPath);
+  const candidatePath = path.resolve(path.dirname(documentFilePath), decodedPath);
+
+  if (!existsSync(candidatePath) || !statSync(candidatePath).isFile()) {
+    return null;
+  }
+
+  const filePath = realpathSync(candidatePath);
+  const relativePath = path.relative(wikiRoot, filePath);
+  if (
+    !relativePath ||
+    relativePath.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativePath)
+  ) {
+    return null;
+  }
+
+  const extension = path.extname(filePath).toLowerCase();
+  const contentType = PUBLIC_MEDIA_TYPES.get(extension);
+  if (!contentType) {
+    return null;
+  }
+
+  const content = readFileSync(filePath);
+  if (extension === ".svg" && !isSafeSvg(content.toString("utf8"))) {
+    return null;
+  }
+
+  const digest = createHash("sha256")
+    .update(content)
+    .digest("hex")
+    .slice(0, 24);
+  const fileName = `${digest}${extension}`;
+
+  return {
+    contentType,
+    fileName,
+    filePath,
+    publicPath: `/media/${fileName}`,
+  };
+}
+
+function isSafeSvg(source: string): boolean {
+  return ![
+    /<\s*(?:embed|foreignObject|iframe|object|script)\b/i,
+    /\bon[a-z]+\s*=/i,
+    /\b(?:href|xlink:href)\s*=\s*["']\s*(?:https?:|\/\/|javascript:)/i,
+  ].some((pattern) => pattern.test(source));
 }
 
 function protectWikiLinkPipesInTables(markdown: string): string {
@@ -625,7 +769,10 @@ function mediaStatusPlugin(): Plugin<[], import("hast").Root> {
       }
 
       const source = String(node.properties.src || "");
-      if (/^(?:https?:|data:)/.test(source)) {
+      node.properties.decoding = "async";
+      node.properties.loading = "lazy";
+
+      if (/^(?:https?:|data:|\/\/|\/media\/)/.test(source)) {
         return;
       }
 

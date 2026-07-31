@@ -34,11 +34,14 @@ The exported site is generated in `out/`. The build supports:
 - YAML frontmatter metadata
 - CommonMark and GitHub Flavored Markdown
 - Obsidian `[[path|label]]` links between published pages
+- Content-hashed static images referenced by published pages
 - Static routes for every published Markdown file
 - Browser-side search over titles, tags, paths, and text
 
 The wiki remains responsible for content only. This repository decides how that
-content is routed and rendered.
+content is routed and rendered. Local images are published only when a maintained
+`tech`, `writing`, or `learning` page references an existing file inside the
+wiki root. Missing or machine-local paths remain visible as unavailable media.
 
 ## GitHub Pages
 
