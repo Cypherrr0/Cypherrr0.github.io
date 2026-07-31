@@ -53,21 +53,22 @@ export function WikiSearch({ pages }: WikiSearchProps) {
   }, [normalizedQuery, pages]);
 
   return (
-    <section aria-labelledby="wiki-pages">
+    <section aria-labelledby="wiki-pages" className="wiki-index">
       <div className="search-row">
         <div>
+          <p className="eyebrow">Index</p>
           <h2 id="wiki-pages">知识地图</h2>
-          <p className="muted">
+          <p aria-live="polite" className="muted">
             {normalizedQuery
               ? `找到 ${results.length} 个结果`
               : `${domains.length} 个知识域，共 ${pages.length} 个公开页面`}
           </p>
         </div>
         <label className="search">
-          <span className="sr-only">搜索 Wiki</span>
+          <span>Search</span>
           <input
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索标题、标签或正文"
+            placeholder="标题、标签或正文"
             type="search"
             value={query}
           />

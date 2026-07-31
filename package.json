@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "geist": "^1.7.1",
     "gray-matter": "^4.0.3",
     "katex": "^0.16.22",
     "next": "16.2.2",

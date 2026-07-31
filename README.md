@@ -18,7 +18,8 @@ COREPEDIA_WIKI_PATH=../corepedia/wikis npm run dev
 
 If `COREPEDIA_WIKI_PATH` is unset, the application looks for
 `../corepedia/wikis` relative to this repository. If the directory is not
-available, the homepage still builds and shows a setup message.
+available, the personal homepage still builds and the `/wiki/` index shows a
+setup message.
 
 ## Production Build
 

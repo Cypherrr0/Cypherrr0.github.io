@@ -1,30 +1,48 @@
-import { WikiSearch } from "@/components/wiki-search";
+import Link from "next/link";
+import { RollingWords } from "@/components/rolling-words";
 import { getWikiPages } from "@/lib/wiki";
 
 export default function Home() {
   const pages = getWikiPages();
 
   return (
-    <main className="site-shell">
-      <header className="hero">
-        <p className="eyebrow">Corepedia</p>
-        <h1>LLM Wiki</h1>
-        <p>
-          内容来自独立的 Corepedia 仓库。这个仓库只负责读取、渲染、搜索与静态发布。
-        </p>
-      </header>
+    <main className="home-shell" id="main-content" tabIndex={-1}>
+      <nav aria-label="主导航" className="home-nav">
+        <span className="site-mark" aria-label="Corepedia">
+          C<span aria-hidden="true">/</span>P
+        </span>
+        <a
+          className="quiet-link"
+          href="https://github.com/Cypherrr0"
+          rel="noreferrer"
+          target="_blank"
+        >
+          GitHub
+          <span aria-hidden="true">↗</span>
+        </a>
+      </nav>
 
-      {pages.length ? (
-        <WikiSearch pages={pages} />
-      ) : (
-        <section className="empty-state" aria-labelledby="wiki-unavailable">
-          <h2 id="wiki-unavailable">Wiki 内容尚未接入</h2>
-          <p>
-            构建时设置 <code>COREPEDIA_WIKI_PATH</code> 指向 Corepedia 的
-            <code>wikis</code> 目录即可生成页面。
-          </p>
-        </section>
-      )}
+      <section aria-labelledby="home-title" className="home-hero">
+        <p className="home-kicker">A personal index</p>
+        <h1 id="home-title">
+          <span>no coding,</span>
+          <RollingWords />
+        </h1>
+        <p className="home-note">
+          把读过的、想过的和仍然不确定的，留下来。
+        </p>
+      </section>
+
+      <footer className="home-footer">
+        <Link className="primary-link" href="/wiki/">
+          <span>Read the wiki</span>
+          <span aria-hidden="true">→</span>
+        </Link>
+        <p>
+          <span>{pages.length || "—"}</span>
+          <span>public notes</span>
+        </p>
+      </footer>
     </main>
   );
 }

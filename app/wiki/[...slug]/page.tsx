@@ -29,7 +29,7 @@ export async function generateMetadata({
 
   return {
     description: page.excerpt,
-    title: `${page.title} | Corepedia`,
+    title: page.title,
   };
 }
 
@@ -40,11 +40,11 @@ export default async function WikiPage({ params }: WikiPageProps) {
   if (!page) {
     if (slug.join("/") === UNAVAILABLE_SLUG.join("/") && !getWikiPages().length) {
       return (
-        <main className="site-shell">
+        <main className="article-shell" id="main-content" tabIndex={-1}>
           <nav aria-label="面包屑" className="breadcrumbs">
-            <Link href="/">Corepedia</Link>
+            <Link href="/">C/P</Link>
             <span aria-hidden="true">/</span>
-            <span>unavailable</span>
+            <Link href="/wiki/">Wiki</Link>
           </nav>
           <section className="empty-state">
             <h1>Wiki 内容尚未接入</h1>
@@ -61,14 +61,16 @@ export default async function WikiPage({ params }: WikiPageProps) {
   }
 
   return (
-    <main className="site-shell">
+    <main className="article-shell" id="main-content" tabIndex={-1}>
       <nav aria-label="面包屑" className="breadcrumbs">
-        <Link href="/">Corepedia</Link>
+        <Link href="/">C/P</Link>
         <span aria-hidden="true">/</span>
-        <span>{page.slug.join(" / ")}</span>
+        <Link href="/wiki/">Wiki</Link>
+        <span aria-hidden="true">/</span>
+        <span>{page.slug[0]}</span>
       </nav>
 
-      <article>
+      <article className="wiki-article">
         <header className="article-header">
           <p className="eyebrow">{page.type || page.slug[0]}</p>
           <h1>{page.title}</h1>
@@ -103,10 +105,18 @@ export default async function WikiPage({ params }: WikiPageProps) {
           ) : null}
         </header>
 
-        <div
-          className="wiki-content"
-          dangerouslySetInnerHTML={{ __html: page.html }}
-        />
+        <div className="article-grid">
+          <aside className="article-rail" aria-label="文章信息">
+            <span>{page.slug[0]}</span>
+            {page.updated ? (
+              <time dateTime={page.updated}>{page.updated}</time>
+            ) : null}
+          </aside>
+          <div
+            className="wiki-content"
+            dangerouslySetInnerHTML={{ __html: page.html }}
+          />
+        </div>
       </article>
     </main>
   );
