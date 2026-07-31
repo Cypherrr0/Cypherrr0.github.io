@@ -1,10 +1,18 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
-import type { Link, PhrasingContent, Root, Text } from "mdast";
+import type {
+  Link,
+  PhrasingContent,
+  Root,
+  Text,
+} from "mdast";
+import type { InlineMath, Math } from "mdast-util-math";
+import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified, type Plugin } from "unified";
@@ -13,6 +21,13 @@ import { visit } from "unist-util-visit";
 const PUBLIC_ROOTS = new Set(["learning", "tech", "writing"]);
 const WIKI_LINK_PATTERN =
   /!?\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g;
+const GREEK_SYMBOL_PATTERN = /[α-ωΑ-Ω]/u;
+const LATEX_COMMAND_PATTERN =
+  /\\(?:alpha|beta|gamma|delta|Delta|epsilon|eta|theta|lambda|mu|nu|pi|rho|sigma|tau|phi|psi|omega|frac|sqrt|sum|prod|int|lim|log|exp|mathcal|mathbf|mathrm|text|operatorname|left|right|begin|end|cdot|times|approx|neq|leq|geq|infty|partial|nabla|hat|bar|tilde|underbrace|overbrace)\b/;
+const SUBSCRIPT_OR_SUPERSCRIPT_PATTERN =
+  /(?:[A-Za-z0-9)}\]])(?:_(?:[A-Za-z0-9]+|\{[^{}]+\})|\^(?:[A-Za-z0-9*+-]+|\{[^{}]+\}))/;
+const MATH_OPERATOR_PATTERN = /(?:=|≈|≠|≤|≥|∑|∏|∫|√|∞|→|←|∝|±|×|·)/u;
+const VARIABLE_TOKEN_PATTERN = /\b[A-Za-z][A-Za-z0-9]*\b/g;
 
 export type WikiPageSummary = {
   excerpt: string;
@@ -198,6 +213,133 @@ function wikiLinkPlugin(publishedRoutes: Set<string>): Plugin<[], Root> {
   };
 }
 
+function formulaCodePlugin(): Plugin<[], Root> {
+  return () => (tree) => {
+    visit(tree, "paragraph", (node, index, parent) => {
+      if (
+        typeof index !== "number" ||
+        !parent ||
+        node.children.length !== 1 ||
+        node.children[0].type !== "inlineCode" ||
+        !isFormulaLikeInlineCode(node.children[0].value)
+      ) {
+        return;
+      }
+
+      const value = normalizeFormula(node.children[0].value);
+      const mathNode: Math = {
+        type: "math",
+        meta: null,
+        value,
+        data: {
+          hName: "pre",
+          hChildren: [
+            {
+              type: "element",
+              tagName: "code",
+              properties: {
+                className: ["language-math", "math-display"],
+              },
+              children: [{ type: "text", value }],
+            },
+          ],
+        },
+      };
+      parent.children.splice(index, 1, mathNode);
+    });
+
+    visit(tree, "inlineCode", (node, index, parent) => {
+      if (
+        typeof index !== "number" ||
+        !parent ||
+        !isFormulaLikeInlineCode(node.value)
+      ) {
+        return;
+      }
+
+      const value = normalizeFormula(node.value);
+      const mathNode: InlineMath = {
+        type: "inlineMath",
+        value,
+        data: {
+          hName: "code",
+          hProperties: {
+            className: ["language-math", "math-inline"],
+          },
+          hChildren: [{ type: "text", value }],
+        },
+      };
+      parent.children.splice(index, 1, mathNode);
+    });
+  };
+}
+
+function isFormulaLikeInlineCode(value: string): boolean {
+  const formula = value.trim();
+  if (!formula || formula.includes("\n") || formula.length > 500) {
+    return false;
+  }
+  if (
+    /(?:https?:\/\/|\/[A-Za-z0-9._-]+|--[A-Za-z-]+|[A-Za-z0-9_-]+\.(?:md|tsx?|jsx?|json|ya?ml|py|go|rs|sh|css|html))/.test(
+      formula,
+    )
+  ) {
+    return false;
+  }
+
+  const hasGreek = GREEK_SYMBOL_PATTERN.test(formula);
+  const hasLatexCommand = LATEX_COMMAND_PATTERN.test(formula);
+  const hasScript = SUBSCRIPT_OR_SUPERSCRIPT_PATTERN.test(formula);
+  const hasMathOperator = MATH_OPERATOR_PATTERN.test(formula);
+  const hasCompleteGroup = /\{[^{}]+\}/.test(formula);
+  const variableCount = formula.match(VARIABLE_TOKEN_PATTERN)?.length ?? 0;
+
+  return (
+    (hasLatexCommand && (hasMathOperator || hasScript || hasCompleteGroup)) ||
+    (hasGreek && hasScript) ||
+    (hasMathOperator && (hasGreek || hasScript)) ||
+    (hasMathOperator && hasScript && variableCount >= 2)
+  );
+}
+
+function normalizeFormula(value: string): string {
+  return value
+    .trim()
+    .replace(
+      /\b([A-Za-z]{2,})(?=_(?:[A-Za-z0-9]+|\{))/g,
+      "\\operatorname{$1}",
+    )
+    .replace(/([α-ωΑ-Ω])/gu, (symbol) => GREEK_TO_LATEX[symbol] || symbol)
+    .replaceAll("ᵀ", "^{\\mathsf T}")
+    .replaceAll("−", "-")
+    .replaceAll("×", "\\times ")
+    .replaceAll("≈", "\\approx ")
+    .replaceAll("≤", "\\leq ")
+    .replaceAll("≥", "\\geq ")
+    .replaceAll("≠", "\\neq ");
+}
+
+const GREEK_TO_LATEX: Record<string, string> = {
+  α: "\\alpha",
+  β: "\\beta",
+  γ: "\\gamma",
+  δ: "\\delta",
+  Δ: "\\Delta",
+  ε: "\\epsilon",
+  η: "\\eta",
+  θ: "\\theta",
+  λ: "\\lambda",
+  μ: "\\mu",
+  ν: "\\nu",
+  π: "\\pi",
+  ρ: "\\rho",
+  σ: "\\sigma",
+  τ: "\\tau",
+  φ: "\\phi",
+  ψ: "\\psi",
+  ω: "\\omega",
+};
+
 function replaceWikiLinks(
   node: Text,
   publishedRoutes: Set<string>,
@@ -248,8 +390,11 @@ async function renderMarkdown(
   const result = await unified()
     .use(remarkParse)
     .use(remarkGfm)
+    .use(remarkMath)
+    .use(formulaCodePlugin())
     .use(wikiLinkPlugin(publishedRoutes))
     .use(remarkRehype)
+    .use(rehypeKatex)
     .use(rehypeSlug)
     .use(rehypeStringify)
     .process(markdown);

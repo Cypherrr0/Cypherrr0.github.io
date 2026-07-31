@@ -399,6 +399,23 @@ code {
   padding: 0;
 }
 
+.wiki-content .katex {
+  font-size: 1.05em;
+}
+
+.wiki-content .katex-display {
+  margin: 1.4rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}
+
+.wiki-content .katex-display > .katex {
+  text-align: left;
+  white-space: nowrap;
+}
+
 .wiki-content table {
   border-collapse: collapse;
   display: block;
