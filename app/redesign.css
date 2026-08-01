@@ -191,47 +191,46 @@ code {
   align-items: baseline;
   display: grid;
   gap: 0.16em;
-  grid-template-columns: 6.9ch auto;
+  grid-template-columns: max-content auto;
   justify-content: start;
   max-width: 100%;
 }
 
 .rolling-words-window {
-  display: block;
-  height: 1.18em;
-  margin: -0.08em -0.14em -0.1em 0;
-  overflow: hidden;
-  padding: 0.08em 0.14em 0.1em 0;
-  position: relative;
+  align-items: baseline;
+  display: grid;
+  line-height: inherit;
 }
 
 .rolling-word {
-  animation: cycle-word 35s infinite var(--ease-out);
-  animation-delay: calc(var(--word-index) * 5s);
-  inset: 0.08em 0.14em 0.1em 0;
+  align-self: baseline;
+  grid-column: 1;
+  grid-row: 1;
+  line-height: inherit;
   opacity: 0;
-  position: absolute;
   text-align: right;
-  transform: translateY(0.28em);
+  transform: translateY(0.1em);
+  transition:
+    opacity 800ms var(--ease-out),
+    transform 800ms var(--ease-out);
   white-space: nowrap;
   will-change: opacity, transform;
 }
 
-.rolling-words-suffix {
-  display: block;
+.rolling-word.is-current {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-@keyframes cycle-word {
-  0%,
-  11.8% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  14.2%,
-  100% {
-    opacity: 0;
-    transform: translateY(-0.22em);
-  }
+.rolling-word.is-previous {
+  opacity: 0;
+  transform: translateY(-0.1em);
+}
+
+.rolling-words-suffix {
+  align-self: baseline;
+  display: block;
+  line-height: inherit;
 }
 
 .home-note {
