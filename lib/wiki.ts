@@ -59,11 +59,13 @@ export type WikiOutlineItem = {
 };
 
 export type WikiPage = WikiPageSummary & {
+  cover: string;
   html: string;
   outline: WikiOutlineItem[];
 };
 
 type WikiDocument = WikiPageSummary & {
+  coverSource: string;
   markdown: string;
 };
 
@@ -110,6 +112,14 @@ export function getWikiMediaAssets(): WikiMediaAsset[] {
   const assets = new Map<string, WikiMediaAsset>();
 
   for (const document of loadWikiDocuments()) {
+    const coverAsset = resolveWikiMediaAsset(
+      document.path,
+      document.coverSource,
+    );
+    if (coverAsset) {
+      assets.set(coverAsset.fileName, coverAsset);
+    }
+
     const tree = unified().use(remarkParse).parse(document.markdown);
     visit(tree, "image", (node: Image) => {
       const asset = resolveWikiMediaAsset(document.path, node.url);
@@ -154,8 +164,10 @@ export async function getWikiPageBySlug(
     document.path,
     linkContext,
   );
+  const cover =
+    resolveWikiMediaAsset(document.path, document.coverSource)?.publicPath || "";
 
-  return { ...toPageSummary(document), html, outline };
+  return { ...toPageSummary(document), cover, html, outline };
 }
 
 function loadWikiDocuments(): WikiDocument[] {
@@ -305,8 +317,10 @@ function parseWikiDocument(
   const slug = routeSlugForPath(relativePath);
   const title = stringValue(parsed.data.title) || titleFromPath(relativePath);
   const searchText = markdownToSearchText(parsed.content);
+  const coverSource = stringValue(parsed.data.cover);
 
   return {
+    coverSource,
     excerpt: createExcerpt(searchText),
     markdown: parsed.content,
     path: relativePath,

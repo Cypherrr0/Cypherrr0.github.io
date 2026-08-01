@@ -191,25 +191,14 @@ export function KnowledgeGraph({
     };
   }, [activeDomain, model]);
 
-  const visiblePages = pages.filter((page) => !isIndexPage(page));
-
   return (
-    <figure className="knowledge-graph">
-      <figcaption>
-        <div>
-          <span>Knowledge graph</span>
-          <strong>关系图</strong>
-        </div>
-        <p>
-          {visiblePages.length} 篇笔记，沿主题层级连接。图谱会缓慢旋转。
-        </p>
-      </figcaption>
+    <div className="knowledge-graph">
       <canvas
         aria-label="Corepedia 知识关系图：页面按学习、技术和写作三个知识域连接"
         ref={canvasRef}
         role="img"
       />
-    </figure>
+    </div>
   );
 }
 

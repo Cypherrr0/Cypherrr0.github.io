@@ -10,7 +10,7 @@ export function ArticleOutline({ items }: ArticleOutlineProps) {
   }
 
   return (
-    <details className="article-outline" open>
+    <details className="article-outline">
       <summary>
         <span>
           <small>Outline</small>

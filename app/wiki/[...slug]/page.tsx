@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArticleOutline } from "@/components/article-outline";
@@ -72,49 +73,70 @@ export default async function WikiPage({ params }: WikiPageProps) {
       </nav>
 
       <article className="wiki-article">
-        <header className="article-header">
-          <p className="eyebrow">{page.type || page.slug[0]}</p>
-          <h1>{page.title}</h1>
-          <dl className="page-meta">
-            {page.status ? (
+        <header
+          className={
+            page.cover ? "article-header has-cover" : "article-header"
+          }
+        >
+          <div className="article-header-copy">
+            <p className="eyebrow">{page.type || page.slug[0]}</p>
+            <h1>{page.title}</h1>
+            <dl className="page-meta">
+              {page.status ? (
+                <div>
+                  <dt>状态</dt>
+                  <dd>{page.status}</dd>
+                </div>
+              ) : null}
+              {page.updated ? (
+                <div>
+                  <dt>更新</dt>
+                  <dd>
+                    <time dateTime={page.updated}>{page.updated}</time>
+                  </dd>
+                </div>
+              ) : null}
               <div>
-                <dt>状态</dt>
-                <dd>{page.status}</dd>
-              </div>
-            ) : null}
-            {page.updated ? (
-              <div>
-                <dt>更新</dt>
+                <dt>路径</dt>
                 <dd>
-                  <time dateTime={page.updated}>{page.updated}</time>
+                  <code>{page.path}</code>
                 </dd>
               </div>
+            </dl>
+            {page.tags.length ? (
+              <ul className="tag-list" aria-label="标签">
+                {page.tags.map((tag) => (
+                  <li key={tag}>{tag}</li>
+                ))}
+              </ul>
             ) : null}
-            <div>
-              <dt>路径</dt>
-              <dd>
-                <code>{page.path}</code>
-              </dd>
-            </div>
-          </dl>
-          {page.tags.length ? (
-            <ul className="tag-list" aria-label="标签">
-              {page.tags.map((tag) => (
-                <li key={tag}>{tag}</li>
-              ))}
-            </ul>
+          </div>
+          {page.cover ? (
+            <figure className="article-cover">
+              <Image
+                alt=""
+                aria-hidden="true"
+                height={1024}
+                priority
+                src={page.cover}
+                unoptimized
+                width={1024}
+              />
+            </figure>
           ) : null}
         </header>
 
         <div className="article-grid">
-          <aside className="article-rail" aria-label="文章信息">
-            <span>{page.slug[0]}</span>
-            {page.updated ? (
-              <time dateTime={page.updated}>{page.updated}</time>
-            ) : null}
+          <aside className="article-rail" aria-label="文章导航">
+            <div className="article-rail-meta">
+              <span>{page.slug[0]}</span>
+              {page.updated ? (
+                <time dateTime={page.updated}>{page.updated}</time>
+              ) : null}
+            </div>
+            <ArticleOutline items={page.outline} />
           </aside>
           <div className="article-main">
-            <ArticleOutline items={page.outline} />
             <div
               className="wiki-content"
               dangerouslySetInnerHTML={{ __html: page.html }}
