@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { WikiEasterEggs } from "@/components/wiki-easter-eggs";
 import { WikiSearch } from "@/components/wiki-search";
 import { getWikiPages } from "@/lib/wiki";
 
@@ -14,9 +15,13 @@ export default function WikiIndex() {
   return (
     <main className="wiki-shell" id="main-content" tabIndex={-1}>
       <nav aria-label="Wiki 导航" className="wiki-nav">
-        <Link className="site-mark" href="/" aria-label="返回首页">
-          C<span aria-hidden="true">/</span>P
-        </Link>
+        <div className="site-mark wiki-site-mark">
+          <Link href="/" aria-label="返回首页">
+            C
+          </Link>
+          <WikiEasterEggs />
+          <span aria-hidden="true">P</span>
+        </div>
         <a
           className="quiet-link"
           href="https://github.com/Cypherrr0"

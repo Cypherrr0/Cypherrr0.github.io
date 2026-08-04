@@ -21,6 +21,7 @@ import { unified, type Plugin } from "unified";
 import { visit } from "unist-util-visit";
 
 const PUBLIC_ROOTS = new Set(["learning", "tech", "writing"]);
+const FRAGMENT_ROOT = "fragments";
 const WIKI_LINK_PATTERN =
   /!?\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g;
 const GREEK_SYMBOL_PATTERN = /[α-ωΑ-Ω]/u;
@@ -87,6 +88,15 @@ export type WikiMediaAsset = {
   publicPath: string;
 };
 
+export type FragmentPage = {
+  content: string;
+  paragraphs: string[];
+  path: string;
+  slug: string;
+  title: string;
+  updated: string;
+};
+
 const wikiLinkCatalogCache = new Map<string, WikiLinkCatalog>();
 const wikiMediaCatalogCache = new Map<string, WikiMediaAsset[]>();
 
@@ -100,6 +110,25 @@ export function getWikiRoot(): string {
 
 export function getWikiPages(): WikiPageSummary[] {
   return loadWikiDocuments().map(toPageSummary);
+}
+
+export function getFragmentPages(): FragmentPage[] {
+  const wikiRoot = getWikiRoot();
+  const fragmentDirectory = path.join(wikiRoot, FRAGMENT_ROOT);
+  if (!existsSync(wikiRoot) || !existsSync(fragmentDirectory)) {
+    return [];
+  }
+
+  assertFragmentIsolation(wikiRoot);
+
+  return readMarkdownFiles(fragmentDirectory)
+    .filter(
+      (filePath) =>
+        !["AGENTS.md", "index.md"].includes(path.basename(filePath)),
+    )
+    .map((filePath) => parseFragmentPage(wikiRoot, filePath))
+    .filter((page): page is FragmentPage => page !== null)
+    .sort((left, right) => left.path.localeCompare(right.path, "zh-CN"));
 }
 
 export function getWikiMediaAssets(): WikiMediaAsset[] {
@@ -332,6 +361,85 @@ function parseWikiDocument(
     type: stringValue(parsed.data.type),
     updated: dateValue(parsed.data.updated),
   };
+}
+
+function parseFragmentPage(
+  wikiRoot: string,
+  filePath: string,
+): FragmentPage | null {
+  const relativePath = path.relative(wikiRoot, filePath).split(path.sep).join("/");
+  if (!relativePath.startsWith(`${FRAGMENT_ROOT}/`)) {
+    return null;
+  }
+
+  const parsed = matter(readFileSync(filePath, "utf8"));
+  const title = stringValue(parsed.data.title) || titleFromPath(relativePath);
+  const content = parsed.content
+    .trim()
+    .replace(/^#\s+.+(?:\r?\n)+/, "")
+    .trim();
+  const paragraphs = content
+    .split(/\r?\n\s*\r?\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  return {
+    content,
+    paragraphs,
+    path: relativePath,
+    slug: wikiTargetForPath(relativePath).split("/").at(-1) || "",
+    title,
+    updated: dateValue(parsed.data.updated),
+  };
+}
+
+function assertFragmentIsolation(wikiRoot: string): void {
+  const fragmentDirectory = path.join(wikiRoot, FRAGMENT_ROOT);
+  if (!existsSync(fragmentDirectory)) {
+    return;
+  }
+
+  const markdownLinkPattern = /!?\[[^\]]+\]\([^)]+\)/;
+  const fragmentReferencePattern =
+    /!?\[\[\s*(?:\.?\/)?fragments(?:\/|#|\]|\|)/i;
+
+  for (const filePath of readMarkdownFiles(wikiRoot)) {
+    const relativePath = path
+      .relative(wikiRoot, filePath)
+      .split(path.sep)
+      .join("/");
+    const source = readFileSync(filePath, "utf8");
+    const parsed = matter(source);
+    const isFragment = relativePath.startsWith(`${FRAGMENT_ROOT}/`);
+
+    if (isFragment) {
+      if (path.basename(filePath) === "AGENTS.md") {
+        continue;
+      }
+
+      const related = stringArray(parsed.data.related);
+      const sourceRefs = stringArray(parsed.data.source_refs);
+      if (
+        related.length ||
+        sourceRefs.length ||
+        WIKI_LINK_PATTERN.test(parsed.content) ||
+        markdownLinkPattern.test(parsed.content)
+      ) {
+        WIKI_LINK_PATTERN.lastIndex = 0;
+        throw new Error(
+          `Fragment pages must remain link-isolated: ${relativePath}`,
+        );
+      }
+      WIKI_LINK_PATTERN.lastIndex = 0;
+      continue;
+    }
+
+    if (fragmentReferencePattern.test(source)) {
+      throw new Error(
+        `Public wiki pages must not reference fragments: ${relativePath}`,
+      );
+    }
+  }
 }
 
 function routeSlugForPath(relativePath: string): string[] {

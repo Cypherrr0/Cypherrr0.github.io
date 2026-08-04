@@ -123,6 +123,41 @@ code {
   color: var(--border-strong);
 }
 
+.wiki-site-mark {
+  gap: 0;
+}
+
+.wiki-site-mark > a {
+  color: var(--foreground);
+  min-height: 2.75rem;
+  text-decoration: none;
+}
+
+.wiki-site-mark > span:last-child {
+  color: var(--foreground);
+}
+
+.wiki-signal-trigger {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--border-strong);
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  min-height: 2.75rem;
+  padding: 0 0.3rem;
+  transition:
+    color var(--transition-fast) ease,
+    transform var(--transition-fast) var(--ease-out);
+}
+
+.wiki-signal-trigger:hover,
+.wiki-signal-trigger.is-listening {
+  color: var(--foreground);
+  transform: rotate(-12deg) scale(1.18);
+}
+
 .quiet-link {
   align-items: center;
   color: var(--muted);
@@ -1219,6 +1254,444 @@ code {
   margin: 3rem 0;
 }
 
+.egg-backdrop {
+  align-items: center;
+  background: rgb(23 23 22 / 0.42);
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  padding: var(--page-gutter);
+  position: fixed;
+  z-index: 30;
+}
+
+.egg-dialog {
+  background: var(--background);
+  border: 1px solid var(--foreground);
+  color: var(--foreground);
+  max-height: min(46rem, calc(100dvh - 2 * var(--page-gutter)));
+  overflow: auto;
+  width: min(100%, 31rem);
+}
+
+.egg-dialog > header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.68rem;
+  justify-content: space-between;
+  letter-spacing: 0.08em;
+  min-height: 3.25rem;
+  padding: 0 1rem;
+  text-transform: uppercase;
+}
+
+.egg-dialog > header button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.2rem;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+}
+
+.egg-dialog h2 {
+  font-family: var(--font-anthropic-serif-display);
+  font-size: clamp(1.9rem, 5vw, 2.8rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin: 0;
+  padding: 1.5rem 1.5rem 0;
+}
+
+.egg-dialog > p {
+  color: var(--muted);
+  margin: 0;
+  padding: 0.9rem 1.5rem 1.5rem;
+}
+
+.cloudflare-loop {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 1.5rem 1.5rem 0;
+}
+
+.cloudflare-loop span {
+  align-content: end;
+  aspect-ratio: 1;
+  background:
+    linear-gradient(90deg, transparent 48%, var(--border) 48% 52%, transparent 52%),
+    linear-gradient(0deg, transparent 48%, var(--border) 48% 52%, transparent 52%),
+    var(--surface);
+  border: 1px solid var(--border);
+  color: transparent;
+  display: grid;
+  font-size: 0;
+  justify-items: end;
+  padding: 0.35rem;
+}
+
+.cloudflare-loop span:nth-child(2n) {
+  background-color: #deded7;
+}
+
+.cloudflare-loop span:nth-child(3n) {
+  background-color: #e8e8e1;
+}
+
+.cloudflare-loop i {
+  align-items: center;
+  background: var(--background);
+  border: 1px solid var(--foreground);
+  color: var(--foreground);
+  display: inline-flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  font-style: normal;
+  height: 1.2rem;
+  justify-content: center;
+  width: 1.2rem;
+}
+
+.cloudflare-actions,
+.sudo-actions,
+.hal-actions {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr 1fr;
+  padding: 1rem 1.5rem 1.5rem;
+}
+
+.egg-decoy,
+.egg-bypass {
+  appearance: none;
+  border: 1px solid var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  min-height: 3rem;
+  padding: 0.55rem 0.75rem;
+  transition:
+    background-color var(--transition-fast) ease,
+    color var(--transition-fast) ease,
+    transform var(--transition-fast) var(--ease-out);
+}
+
+.egg-decoy {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.egg-bypass {
+  background: transparent;
+  color: var(--muted);
+}
+
+.egg-bypass:hover {
+  color: var(--foreground);
+}
+
+.egg-decoy:active,
+.egg-bypass:active {
+  transform: scale(0.98);
+}
+
+.cloudflare-egg footer {
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.58rem;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+}
+
+.sudo-egg {
+  background: #151514;
+  color: #f5f5f2;
+}
+
+.sudo-egg > header {
+  border-color: #44443f;
+}
+
+.sudo-egg > header button {
+  color: #a8a8a0;
+}
+
+.sudo-terminal {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.76rem;
+  min-height: 17rem;
+  padding: 1.5rem;
+}
+
+.sudo-terminal p {
+  margin: 0 0 0.6rem;
+}
+
+.sudo-terminal p:nth-child(3),
+.sudo-terminal p:nth-child(4) {
+  color: #c9c9c0;
+}
+
+.sudo-cursor {
+  animation: signal-blink 1s steps(1, end) infinite;
+}
+
+.sudo-actions {
+  border-color: #44443f;
+}
+
+.sudo-egg .egg-decoy {
+  background: #f5f5f2;
+  border-color: #f5f5f2;
+  color: #151514;
+}
+
+.sudo-egg .egg-bypass {
+  border-color: #77776f;
+  color: #c9c9c0;
+}
+
+.hal-eye {
+  align-items: center;
+  border: 1px solid var(--border-strong);
+  display: flex;
+  height: 9rem;
+  justify-content: center;
+  margin: 2rem auto 0.5rem;
+  width: 9rem;
+}
+
+.hal-eye::before {
+  background: #b52821;
+  border: 1rem solid #3c3c38;
+  content: "";
+  height: 4.5rem;
+  width: 4.5rem;
+}
+
+.hal-eye span {
+  background: var(--foreground);
+  height: 0.85rem;
+  margin-left: -2.7rem;
+  position: relative;
+  width: 0.85rem;
+}
+
+.fragment-shell {
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding: 0 var(--page-gutter) clamp(7rem, 12vw, 12rem);
+  width: min(100%, var(--page-width));
+}
+
+.fragment-shell,
+.fragment-shell button {
+  font-family: var(--font-noto-serif-ethiopic), serif;
+}
+
+.fragment-nav {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  min-height: 5.5rem;
+}
+
+.fragment-nav a {
+  color: var(--foreground);
+  font-size: 1.15rem;
+  min-height: 2.75rem;
+  text-decoration: none;
+}
+
+.fragment-nav span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.fragment-hero {
+  border-bottom: 1px solid var(--foreground);
+  padding: clamp(5rem, 10vw, 10rem) 0 clamp(3.5rem, 7vw, 6rem);
+}
+
+.fragment-hero > p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  margin: 0 0 1.5rem;
+}
+
+.fragment-hero h1 {
+  font-size: clamp(4.25rem, 12vw, 11rem);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 0.95;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.fragment-hero > span {
+  color: var(--muted);
+  display: block;
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+  line-height: 1.8;
+  margin: 2.5rem 0 0 auto;
+  max-width: 30rem;
+}
+
+.fragment-list {
+  display: grid;
+  gap: clamp(5rem, 10vw, 10rem);
+  padding-top: clamp(4rem, 8vw, 7rem);
+}
+
+.fragment-entry {
+  display: grid;
+  gap: clamp(2rem, 5vw, 5rem);
+  grid-template-columns: minmax(11rem, 0.55fr) minmax(0, 1.45fr);
+}
+
+.fragment-entry > header {
+  align-content: start;
+  display: grid;
+  gap: 1.25rem;
+  position: sticky;
+  top: 2rem;
+}
+
+.fragment-entry > header > span,
+.fragment-entry time {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.fragment-entry h2 {
+  font-size: clamp(2rem, 4vw, 3.8rem);
+  font-weight: 400;
+  line-height: 1.1;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fragment-entry h2 button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: inherit;
+  line-height: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.fragment-entry h2 button.is-revealed {
+  font-family: var(--font-anthropic-serif-display);
+  letter-spacing: -0.04em;
+}
+
+.fragment-passages {
+  border-top: 1px solid var(--foreground);
+}
+
+.fragment-passages > button {
+  align-items: start;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  cursor: pointer;
+  display: grid;
+  font-size: clamp(1.25rem, 2.2vw, 2rem);
+  gap: 1.25rem;
+  grid-template-columns: 2.5rem 1fr;
+  line-height: 1.75;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: clamp(1.5rem, 3vw, 2.5rem) 0;
+  text-align: left;
+  width: 100%;
+}
+
+.fragment-passages > button:hover {
+  background: rgb(23 23 22 / 0.025);
+}
+
+.fragment-passages > button.is-revealed {
+  font-family: var(--font-anthropic-serif-text);
+  font-size: clamp(1rem, 1.35vw, 1.13rem);
+  line-height: 1.9;
+}
+
+.fragment-line-number {
+  color: var(--muted);
+  font-size: 0.68rem;
+  padding-top: 0.55rem;
+}
+
+.fragment-gate {
+  align-content: center;
+  display: grid;
+  justify-items: center;
+  min-height: 100dvh;
+  padding-bottom: var(--page-gutter);
+  text-align: center;
+}
+
+.fragment-gate h1 {
+  font-size: clamp(2.75rem, 8vw, 6rem);
+  font-weight: 400;
+  line-height: 1;
+  margin: 1.5rem 0 0;
+}
+
+.fragment-gate p {
+  color: var(--muted);
+  margin: 1.25rem 0 2rem;
+}
+
+.fragment-gate a {
+  color: var(--foreground);
+  font-size: 1rem;
+}
+
+.fragment-lock-glyph {
+  border: 1px solid var(--foreground);
+  display: grid;
+  font-size: 2rem;
+  height: 5rem;
+  place-items: center;
+  width: 5rem;
+}
+
+.fragment-signal {
+  animation: signal-blink 1.2s steps(1, end) infinite;
+}
+
+@keyframes signal-blink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+
+  49%,
+  100% {
+    opacity: 0.35;
+  }
+}
+
 @media (max-width: 800px) {
   .wiki-hero,
   .domain-section {
@@ -1313,6 +1786,14 @@ code {
     top: auto;
     width: 100%;
   }
+
+  .fragment-entry {
+    grid-template-columns: 1fr;
+  }
+
+  .fragment-entry > header {
+    position: static;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1394,6 +1875,34 @@ code {
     display: grid;
     width: 100%;
   }
+
+  .egg-backdrop {
+    padding: 0.75rem;
+  }
+
+  .egg-dialog {
+    max-height: calc(100dvh - 1.5rem);
+  }
+
+  .cloudflare-actions,
+  .sudo-actions,
+  .hal-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .fragment-nav {
+    min-height: 4.75rem;
+  }
+
+  .fragment-hero {
+    padding-top: 4rem;
+  }
+
+  .fragment-passages > button {
+    font-size: 1.2rem;
+    gap: 0.75rem;
+    grid-template-columns: 1.8rem 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1418,5 +1927,10 @@ code {
 
   .rolling-word:first-child {
     opacity: 1 !important;
+  }
+
+  .sudo-cursor,
+  .fragment-signal {
+    animation: none !important;
   }
 }

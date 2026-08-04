@@ -63,6 +63,15 @@ const anthropicSerifText = localFont({
   variable: "--font-anthropic-serif-text",
 });
 
+const notoSerifEthiopic = localFont({
+  adjustFontFallback: false,
+  display: "swap",
+  fallback: ["serif"],
+  src: "./fonts/noto-serif-ethiopic-regular.ttf",
+  variable: "--font-noto-serif-ethiopic",
+  weight: "400",
+});
+
 export const metadata: Metadata = {
   description: "No coding, thoughts only. A quiet entrance to Corepedia.",
   title: {
@@ -78,7 +87,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      className={`${anthropicSerifDisplay.variable} ${anthropicSerifText.variable} ${GeistMono.variable}`}
+      className={`${anthropicSerifDisplay.variable} ${anthropicSerifText.variable} ${notoSerifEthiopic.variable} ${GeistMono.variable}`}
       lang="zh-CN"
     >
       <body>
