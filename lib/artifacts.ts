@@ -43,6 +43,7 @@ const ALLOWED_MANIFEST_FIELDS = new Set([
   "id",
   "interaction",
   "kind",
+  "mobile",
   "network",
   "preview",
   "schemaVersion",
@@ -127,6 +128,7 @@ type ArtifactManifest = {
   id: string;
   interaction: string;
   kind: "h5";
+  mobile: "desktop-only" | "supported";
   network: [];
   preview: string;
   schemaVersion: 1;
@@ -220,10 +222,48 @@ export function artifactMarkdownPlugin(
         data: {
         hName: "figure",
         hProperties: {
-          className: ["wiki-artifact"],
+          className: [
+            "wiki-artifact",
+            artifact.mobile === "desktop-only" ? "is-desktop-only" : "",
+          ].filter(Boolean),
           dataArtifactId: artifact.id,
         },
         hChildren: [
+          ...(artifact.mobile === "desktop-only"
+            ? [
+                {
+                  type: "element" as const,
+                  tagName: "div",
+                  properties: {
+                    className: ["wiki-artifact-mobile-notice"],
+                  },
+                  children: [
+                    {
+                      type: "element" as const,
+                      tagName: "strong",
+                      properties: {},
+                      children: [
+                        {
+                          type: "text" as const,
+                          value: "请使用电脑端打开",
+                        },
+                      ],
+                    },
+                    {
+                      type: "element" as const,
+                      tagName: "span",
+                      properties: {},
+                      children: [
+                        {
+                          type: "text" as const,
+                          value: "此交互图依赖横向空间关系，手机端仅保留正文说明。",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ]
+            : []),
           {
             type: "element",
             tagName: "div",
@@ -479,6 +519,7 @@ function validateManifest(
 
   if (
     value.activation !== "click" ||
+    (value.mobile !== "desktop-only" && value.mobile !== "supported") ||
     typeof value.aspectRatio !== "string" ||
     !/^\d{1,2}\s*\/\s*\d{1,2}$/.test(value.aspectRatio) ||
     !Array.isArray(value.network) ||

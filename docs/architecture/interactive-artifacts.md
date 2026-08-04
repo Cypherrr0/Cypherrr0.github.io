@@ -174,6 +174,7 @@ wikis/tech/llm/agent-loop/
   "entry": "scene.excalidraw",
   "preview": "preview.png",
   "aspectRatio": "16 / 10",
+  "mobile": "desktop-only",
   "height": {
     "inline": 560,
     "stage": 820
@@ -196,6 +197,7 @@ H5 游戏示例：
   "entry": "dist/index.html",
   "preview": "preview.png",
   "aspectRatio": "16 / 9",
+  "mobile": "desktop-only",
   "height": {
     "inline": 520,
     "stage": 860
@@ -211,6 +213,7 @@ H5 游戏示例：
 - `id` 全站唯一，发布后不随标题变化；
 - 所有路径必须相对 manifest，解析后仍位于该制品目录；
 - `network` 默认且优先保持空数组；
+- `mobile` 必填，取 `desktop-only` 或 `supported`；默认前者，只有完成独立 390px 浏览器验收后才允许声明后者；
 - 能力采用显式 allowlist，未知能力直接失败；
 - `description` 和 `preview` 必填，交互不能成为正文唯一的信息载体。
 
@@ -552,6 +555,7 @@ H5 底座使未来选择 SDK 不再是架构迁移，只是某个制品的作者
 8. 普通 Wiki 页面不会下载 Excalidraw 或 H5 runtime；
 9. Corepedia 是唯一内容源，网站仓库仍只保存展示与发布代码；
 10. 新增 renderer 不需要修改现有 Markdown 协议。
+11. `desktop-only` 制品在手机端不显示画板或启动入口，只显示电脑端打开提示；`supported` 制品必须通过独立手机布局验收。
 
 ## 15. 参考
 

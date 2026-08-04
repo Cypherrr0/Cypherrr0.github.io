@@ -6,6 +6,7 @@ type ArtifactRunnerProps = {
   artifactId: string;
   capabilities: string[];
   html: string;
+  mobile: "desktop-only" | "supported";
   previewPath: string;
   title: string;
 };
@@ -21,17 +22,27 @@ export function ArtifactRunner({
   artifactId,
   capabilities,
   html,
+  mobile,
   previewPath,
   title,
 }: ArtifactRunnerProps) {
   const [active, setActive] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+  const [mobileViewport, setMobileViewport] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const send = useCallback((message: Record<string, unknown>) => {
     frameRef.current?.contentWindow?.postMessage(message, "*");
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 560px)");
+    const update = () => setMobileViewport(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
   }, []);
 
   useEffect(() => {
@@ -130,6 +141,18 @@ export function ArtifactRunner({
   ]
     .filter(Boolean)
     .join(" ");
+
+  if (mobile === "desktop-only" && mobileViewport) {
+    return (
+      <div
+        className="artifact-runner artifact-runner-mobile-notice"
+        data-artifact-id={artifactId}
+      >
+        <strong>请使用电脑端打开</strong>
+        <span>此交互图依赖横向空间关系，手机端仅保留正文说明。</span>
+      </div>
+    );
+  }
 
   return (
     <div
