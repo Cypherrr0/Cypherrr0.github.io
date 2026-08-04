@@ -128,23 +128,34 @@ code {
 }
 
 .wiki-site-mark > a {
+  align-items: center;
   color: var(--foreground);
+  display: inline-flex;
+  line-height: 1;
   min-height: 2.75rem;
   text-decoration: none;
 }
 
 .wiki-site-mark > span:last-child {
+  align-items: center;
   color: var(--foreground);
+  display: inline-flex;
+  line-height: 1;
+  min-height: 2.75rem;
 }
 
 .wiki-signal-trigger {
+  align-items: center;
   appearance: none;
   background: transparent;
   border: 0;
   color: var(--border-strong);
   cursor: pointer;
+  display: inline-flex;
   font: inherit;
+  justify-content: center;
   letter-spacing: inherit;
+  line-height: 1;
   min-height: 2.75rem;
   padding: 0 0.3rem;
   transition:
@@ -1499,6 +1510,25 @@ code {
   font-family: var(--font-noto-serif-ethiopic), serif;
 }
 
+.fragment-decode {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  margin: 0;
+  padding: 0;
+  text-align: inherit;
+  white-space: pre-line;
+}
+
+.fragment-decode.is-revealed {
+  font-family: var(--font-anthropic-serif-text);
+}
+
 .fragment-nav {
   align-items: center;
   border-bottom: 1px solid var(--border);
@@ -1507,14 +1537,27 @@ code {
   min-height: 5.5rem;
 }
 
+.fragment-nav > div {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
 .fragment-nav a {
+  align-items: center;
   color: var(--foreground);
-  font-size: 1.15rem;
+  display: inline-flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.9rem;
+  justify-content: center;
   min-height: 2.75rem;
+  min-width: 1.5rem;
   text-decoration: none;
 }
 
-.fragment-nav span {
+.fragment-nav .fragment-decode {
+  min-height: 1.5rem;
+  min-width: 1.5rem;
   color: var(--muted);
   font-size: 0.8rem;
 }
@@ -1524,8 +1567,9 @@ code {
   padding: clamp(5rem, 10vw, 10rem) 0 clamp(3.5rem, 7vw, 6rem);
 }
 
-.fragment-hero > p {
+.fragment-hero-kicker {
   color: var(--muted);
+  display: block;
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   margin: 0 0 1.5rem;
@@ -1540,7 +1584,12 @@ code {
   overflow-wrap: anywhere;
 }
 
-.fragment-hero > span {
+.fragment-hero h1 .fragment-decode.is-revealed {
+  font-family: var(--font-anthropic-serif-display);
+  letter-spacing: -0.04em;
+}
+
+.fragment-hero-note {
   color: var(--muted);
   display: block;
   font-size: clamp(1rem, 1.6vw, 1.25rem);
@@ -1569,7 +1618,7 @@ code {
   top: 2rem;
 }
 
-.fragment-entry > header > span,
+.fragment-entry-number,
 .fragment-entry time {
   color: var(--muted);
   font-size: 0.72rem;
@@ -1599,6 +1648,14 @@ code {
 .fragment-entry h2 button.is-revealed {
   font-family: var(--font-anthropic-serif-display);
   letter-spacing: -0.04em;
+}
+
+.fragment-entry time .fragment-decode.is-revealed,
+.fragment-entry-number.is-revealed,
+.fragment-hero-kicker.is-revealed,
+.fragment-hero-note.is-revealed,
+.fragment-nav .fragment-decode.is-revealed {
+  font-family: var(--font-anthropic-serif-text);
 }
 
 .fragment-passages {
@@ -1657,22 +1714,32 @@ code {
   margin: 1.5rem 0 0;
 }
 
-.fragment-gate p {
+.fragment-gate-copy {
   color: var(--muted);
+  display: block;
   margin: 1.25rem 0 2rem;
 }
 
-.fragment-gate a {
+.fragment-gate-return {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.fragment-gate-return a {
   color: var(--foreground);
+  font-family: var(--font-geist-mono), monospace;
   font-size: 1rem;
+  text-decoration: none;
 }
 
 .fragment-lock-glyph {
+  align-items: center;
   border: 1px solid var(--foreground);
-  display: grid;
+  display: inline-flex;
   font-size: 2rem;
   height: 5rem;
-  place-items: center;
+  justify-content: center;
   width: 5rem;
 }
 

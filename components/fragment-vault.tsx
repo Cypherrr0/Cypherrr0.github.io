@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useFragmentAccess } from "@/components/use-fragment-access";
 import type { FragmentPage } from "@/lib/wiki";
 
@@ -42,22 +42,41 @@ export function FragmentVault({ pages }: { pages: FragmentPage[] }) {
       return;
     }
 
-    const originalText = skipLink.textContent;
-    skipLink.textContent = "ወደ ዋናው ይዝለሉ";
+    const wasHidden = skipLink.hidden;
+    skipLink.hidden = true;
     return () => {
-      skipLink.textContent = originalText;
+      skipLink.hidden = wasHidden;
     };
   }, []);
 
   if (!isUnlocked) {
     return (
       <main className="fragment-shell fragment-gate" id="main-content">
-        <div aria-hidden="true" className="fragment-lock-glyph">
-          ፨
+        <RevealableText
+          className="fragment-lock-glyph"
+          decoded="锁"
+          encoded="፨"
+        />
+        <h1>
+          <RevealableText
+            decoded="入口不存在"
+            encoded="መግቢያ አልተገኘም"
+          />
+        </h1>
+        <RevealableText
+          className="fragment-gate-copy"
+          decoded="这条路径不在普通索引中。"
+          encoded="መንገዱ በማውጫው ውስጥ አይገኝም።"
+        />
+        <div className="fragment-gate-return">
+          <Link aria-label="返回 Wiki" href="/wiki/">
+            ←
+          </Link>
+          <RevealableText
+            decoded="返回普通索引"
+            encoded="ወደ ማውጫው ተመለስ"
+          />
         </div>
-        <h1>መግቢያ አልተገኘም</h1>
-        <p>መንገዱ በማውጫው ውስጥ አይገኝም።</p>
-        <Link href="/wiki/">ወደ ማውጫው ተመለስ</Link>
       </main>
     );
   }
@@ -65,20 +84,29 @@ export function FragmentVault({ pages }: { pages: FragmentPage[] }) {
   return (
     <main className="fragment-shell" id="main-content">
       <nav aria-label="Fragments 导航" className="fragment-nav">
-        <Link href="/wiki/" aria-label="返回 Wiki">
-          ፨
-        </Link>
-        <span aria-hidden="true">ምልክት ፩፪፻</span>
+        <div>
+          <Link href="/wiki/" aria-label="返回 Wiki">
+            ←
+          </Link>
+          <RevealableText decoded="返回 Wiki" encoded="፨" />
+        </div>
+        <RevealableText decoded="信号 1200" encoded="ምልክት ፩፪፻" />
       </nav>
 
       <header className="fragment-hero">
-        <p>መደበኛ ማውጫው ያልመዘገበው</p>
-        <h1>ፍርስራሾች</h1>
-        <span>
-          የተለዩ ንግግሮች። የተደበቁ ምልክቶች።
-          <br />
-          ጽሑፉን ለማስታወስ ንካ።
-        </span>
+        <RevealableText
+          className="fragment-hero-kicker"
+          decoded="普通索引没有记录这里"
+          encoded="መደበኛ ማውጫው ያልመዘገበው"
+        />
+        <h1>
+          <RevealableText decoded="碎片" encoded="ፍርስራሾች" />
+        </h1>
+        <RevealableText
+          className="fragment-hero-note"
+          decoded={"异常语录。隐藏信号。\n点击文字以恢复。"}
+          encoded={"የተለዩ ንግግሮች። የተደበቁ ምልክቶች።\nጽሑፉን ለማስታወስ ንካ።"}
+        />
       </header>
 
       <section aria-label="隐藏语录" className="fragment-list">
@@ -98,11 +126,7 @@ function FragmentEntry({
   pageIndex: number;
 }) {
   const [revealed, setRevealed] = useState<Set<number>>(() => new Set());
-  const [isTitleRevealed, setIsTitleRevealed] = useState(false);
-  const encodedTitle = useMemo(
-    () => encodeAsEthiopic(page.title, `${page.slug}:title`),
-    [page.slug, page.title],
-  );
+  const encodedTitle = encodeAsEthiopic(page.title, `${page.slug}:title`);
 
   const toggle = (paragraphIndex: number) => {
     setRevealed((current) => {
@@ -119,22 +143,17 @@ function FragmentEntry({
   return (
     <article className="fragment-entry">
       <header>
-        <span>{toEthiopicNumber(pageIndex + 1)}</span>
+        <RevealableText
+          className="fragment-entry-number"
+          decoded={`第 ${pageIndex + 1} 则`}
+          encoded={toEthiopicNumber(pageIndex + 1)}
+        />
         <h2>
-          <button
-            aria-label={
-              isTitleRevealed ? "再次点击恢复吉兹字形" : "点击显示中文标题"
-            }
-            aria-pressed={isTitleRevealed}
-            className={isTitleRevealed ? "is-revealed" : undefined}
-            lang={isTitleRevealed ? "zh-CN" : "am"}
-            onClick={() => setIsTitleRevealed((current) => !current)}
-            type="button"
-          >
-            {isTitleRevealed ? page.title : encodedTitle}
-          </button>
+          <RevealableText decoded={page.title} encoded={encodedTitle} />
         </h2>
-        <time dateTime={page.updated}>{toEthiopicDate(page.updated)}</time>
+        <time dateTime={page.updated}>
+          <RevealableText decoded={page.updated} encoded={toEthiopicDate(page.updated)} />
+        </time>
       </header>
       <div className="fragment-passages">
         {page.paragraphs.map((paragraph, paragraphIndex) => {
@@ -157,7 +176,9 @@ function FragmentEntry({
               type="button"
             >
               <span aria-hidden="true" className="fragment-line-number">
-                {toEthiopicNumber(paragraphIndex + 1)}
+                {isRevealed
+                  ? `第 ${paragraphIndex + 1} 段`
+                  : toEthiopicNumber(paragraphIndex + 1)}
               </span>
               <span>{isRevealed ? paragraph : encoded}</span>
             </button>
@@ -165,6 +186,39 @@ function FragmentEntry({
         })}
       </div>
     </article>
+  );
+}
+
+function RevealableText({
+  className,
+  decoded,
+  encoded,
+}: {
+  className?: string;
+  decoded: string;
+  encoded: string;
+}) {
+  const [isRevealed, setIsRevealed] = useState(false);
+
+  return (
+    <button
+      aria-label={
+        isRevealed ? "再次点击恢复吉兹字形" : "点击显示中文原文"
+      }
+      aria-pressed={isRevealed}
+      className={[
+        "fragment-decode",
+        className,
+        isRevealed ? "is-revealed" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      lang={isRevealed ? "zh-CN" : "am"}
+      onClick={() => setIsRevealed((current) => !current)}
+      type="button"
+    >
+      {isRevealed ? decoded : encoded}
+    </button>
   );
 }
 
