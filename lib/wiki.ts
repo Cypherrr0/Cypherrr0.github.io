@@ -19,6 +19,7 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified, type Plugin } from "unified";
 import { visit } from "unist-util-visit";
+import { artifactMarkdownPlugin } from "@/lib/artifacts";
 
 const PUBLIC_ROOTS = new Set(["learning", "tech", "writing"]);
 const FRAGMENT_ROOT = "fragments";
@@ -715,6 +716,7 @@ async function renderMarkdown(
     .use(remarkMath)
     .use(formulaCodePlugin())
     .use(wikiLinkPlugin(linkContext))
+    .use(artifactMarkdownPlugin(documentPath))
     .use(localMediaPlugin(documentPath))
     .use(remarkRehype)
     .use(rehypeKatex)
@@ -933,7 +935,7 @@ function mediaStatusPlugin(): Plugin<[], import("hast").Root> {
       node.properties.decoding = "async";
       node.properties.loading = "lazy";
 
-      if (/^(?:https?:|data:|\/\/|\/media\/)/.test(source)) {
+      if (/^(?:https?:|data:|\/\/|\/media\/|\/artifacts\/)/.test(source)) {
         return;
       }
 

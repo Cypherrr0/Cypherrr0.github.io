@@ -1265,6 +1265,234 @@ code {
   margin: 3rem 0;
 }
 
+.wiki-artifact {
+  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--foreground);
+  margin: 2.5rem 0;
+  padding: 1rem 0 0;
+}
+
+.wiki-artifact-stage {
+  background: var(--background);
+  min-height: var(--artifact-inline-height, 35rem);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.wiki-artifact-preview,
+.wiki-artifact-frame {
+  border: 0;
+  display: block;
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.wiki-artifact-preview {
+  object-fit: cover;
+}
+
+.wiki-artifact-frame {
+  background: transparent;
+}
+
+.wiki-artifact-caption {
+  align-items: baseline;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  display: flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  gap: 1rem;
+  justify-content: space-between;
+  line-height: 1.5;
+  padding: 0.85rem 0;
+}
+
+.wiki-artifact-open {
+  color: var(--foreground);
+  flex: 0 0 auto;
+}
+
+.artifact-embed-page {
+  background: var(--background);
+  height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+}
+
+.artifact-runner {
+  background: var(--background);
+  height: 100%;
+  min-height: 16rem;
+  position: relative;
+  width: 100%;
+}
+
+.artifact-runner.is-active {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.artifact-activation {
+  background: var(--background);
+  border: 0;
+  color: var(--foreground);
+  cursor: pointer;
+  display: block;
+  height: 100%;
+  padding: 0;
+  position: relative;
+  width: 100%;
+}
+
+.artifact-activation img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.72;
+  transition: opacity var(--transition-fast) ease;
+  width: 100%;
+}
+
+.artifact-activation span {
+  background: var(--foreground);
+  bottom: 1rem;
+  color: var(--background);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72rem;
+  left: 1rem;
+  letter-spacing: 0.04em;
+  padding: 0.7rem 0.9rem;
+  position: absolute;
+}
+
+.artifact-activation:hover img {
+  opacity: 1;
+}
+
+.artifact-activation:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: -6px;
+}
+
+.artifact-inner-frame {
+  background: var(--background);
+  border: 0;
+  display: block;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+.artifact-runtime-status {
+  align-items: center;
+  background: var(--background);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  display: flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.66rem;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+}
+
+.artifact-runtime-status button {
+  background: transparent;
+  border: 0;
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  min-height: 2rem;
+  padding: 0 0.25rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.artifact-page {
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding: 0 var(--page-gutter) clamp(2rem, 4vw, 4rem);
+  width: min(100%, var(--page-width));
+}
+
+.artifact-page-nav {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  display: flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72rem;
+  gap: 0.6rem;
+  min-height: 5.5rem;
+}
+
+.artifact-page-header {
+  border-bottom: 1px solid var(--foreground);
+  display: grid;
+  gap: 0.75rem;
+  padding: clamp(2rem, 5vw, 4.5rem) 0;
+}
+
+.artifact-page-header p {
+  color: var(--muted);
+  margin: 0;
+  max-width: 46rem;
+}
+
+.artifact-page-header p:first-child {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.artifact-page-header h1 {
+  font-family: var(--font-anthropic-serif-display);
+  font-size: clamp(2.5rem, 6vw, 5.5rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  margin: 0;
+}
+
+.artifact-page-stage {
+  height: min(72dvh, 54rem);
+  min-height: 32rem;
+  padding: clamp(1rem, 2vw, 1.5rem) 0;
+}
+
+.artifact-page-stage iframe {
+  border: 1px solid var(--border-strong);
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.artifact-page-footer {
+  align-items: baseline;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  display: flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72rem;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-top: 1rem;
+}
+
+.artifact-page-footer p {
+  margin: 0;
+}
+
+.artifact-empty {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+}
+
 .egg-backdrop {
   align-items: center;
   background: rgb(23 23 22 / 0.42);
@@ -1936,6 +2164,22 @@ code {
 
   .article-outline .outline-depth-4 a {
     padding-left: 1.5rem;
+  }
+
+  .wiki-artifact-stage {
+    aspect-ratio: auto !important;
+    min-height: 46rem;
+  }
+
+  .wiki-artifact-caption,
+  .artifact-page-footer {
+    align-items: flex-start;
+    display: grid;
+  }
+
+  .artifact-page-stage {
+    height: 72dvh;
+    min-height: 38rem;
   }
 
   .page-meta div:last-child {
