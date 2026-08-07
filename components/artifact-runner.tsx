@@ -8,7 +8,6 @@ type ArtifactRunnerProps = {
   capabilities: string[];
   html: string;
   mobile: "desktop-only" | "supported";
-  previewPath: string;
   runtime: PublishedArtifactRuntime | null;
   title: string;
 };
@@ -25,7 +24,6 @@ export function ArtifactRunner({
   capabilities,
   html,
   mobile,
-  previewPath,
   runtime,
   title,
 }: ArtifactRunnerProps) {
@@ -37,6 +35,7 @@ export function ArtifactRunner({
     runtime ? null : html,
   );
   const [mobileViewport, setMobileViewport] = useState(false);
+  const [viewportReady, setViewportReady] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -46,11 +45,21 @@ export function ArtifactRunner({
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 560px)");
-    const update = () => setMobileViewport(query.matches);
+    const update = () => {
+      setMobileViewport(query.matches);
+      setViewportReady(true);
+    };
     update();
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);
+
+  useEffect(() => {
+    if (!viewportReady) {
+      return;
+    }
+    setActive(!(mobile === "desktop-only" && mobileViewport));
+  }, [mobile, mobileViewport, viewportReady]);
 
   useEffect(() => {
     if (!active || !runtime || runtimeHtml) {
@@ -213,12 +222,6 @@ export function ArtifactRunner({
     };
   }, [active, send]);
 
-  const activate = () => {
-    setActive(true);
-    setReady(false);
-    setError("");
-  };
-
   const reset = () => {
     send({ type: "corepedia:reset" });
   };
@@ -237,14 +240,21 @@ export function ArtifactRunner({
     .filter(Boolean)
     .join(" ");
 
-  if (mobile === "desktop-only" && mobileViewport) {
+  if (
+    !viewportReady ||
+    (mobile === "desktop-only" && mobileViewport)
+  ) {
     return (
       <div
         className="artifact-runner artifact-runner-mobile-notice"
         data-artifact-id={artifactId}
       >
-        <strong>请使用电脑端打开</strong>
-        <span>此交互图依赖横向空间关系，手机端仅保留正文说明。</span>
+        {viewportReady ? (
+          <>
+            <strong>请使用电脑端打开</strong>
+            <span>此交互图依赖横向空间关系，手机端仅保留正文说明。</span>
+          </>
+        ) : null}
       </div>
     );
   }
@@ -255,19 +265,7 @@ export function ArtifactRunner({
       data-artifact-id={artifactId}
       ref={rootRef}
     >
-      {!active ? (
-        <button
-          aria-label={`启动交互：${title}`}
-          className="artifact-activation"
-          onClick={activate}
-          type="button"
-        >
-          {/* The passive preview is required when scripts are disabled. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img alt="" aria-hidden="true" src={previewPath} />
-          <span>启动交互</span>
-        </button>
-      ) : (
+      {active ? (
         <>
           {runtimeHtml ? (
             <iframe
@@ -299,7 +297,7 @@ export function ArtifactRunner({
             </button>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -143,7 +143,7 @@ export type ArtifactRuntimeIdentity = {
 };
 
 type ArtifactManifest = {
-  activation: "click";
+  activation: "auto" | "click";
   artifactRole: string;
   aspectRatio: string;
   budget: ArtifactBudget;
@@ -342,19 +342,6 @@ export function artifactMarkdownPlugin(
               style: `--artifact-inline-height: ${artifact.height.inline}px; aspect-ratio: ${artifact.aspectRatio}`,
             },
             children: [
-              {
-                type: "element",
-                tagName: "img",
-                properties: {
-                  alt: "",
-                  ariaHidden: "true",
-                  className: ["wiki-artifact-preview"],
-                  decoding: "async",
-                  loading: "lazy",
-                  src: `/artifacts/${artifact.id}/preview`,
-                },
-                children: [],
-              },
               {
                 type: "element",
                 tagName: "iframe",
@@ -615,7 +602,7 @@ function validateManifest(
   }
 
   if (
-    value.activation !== "click" ||
+    (value.activation !== "auto" && value.activation !== "click") ||
     (value.mobile !== "desktop-only" && value.mobile !== "supported") ||
     typeof value.aspectRatio !== "string" ||
     !/^\d{1,2}\s*\/\s*\d{1,2}$/.test(value.aspectRatio) ||

@@ -38,7 +38,6 @@ export default async function ArtifactEmbedPage({
         capabilities={artifact.capabilities}
         html={artifact.html}
         mobile={artifact.mobile}
-        previewPath={`/artifacts/${artifact.id}/preview`}
         runtime={artifact.resolvedRuntime}
         title={artifact.title}
       />
