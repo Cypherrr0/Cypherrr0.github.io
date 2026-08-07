@@ -5,6 +5,7 @@ import {
   realpathSync,
   statSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import type { Code, Root, RootContent } from "mdast";
 import remarkParse from "remark-parse";
@@ -60,11 +61,11 @@ const REQUIRED_PROTOCOL_TOKENS = [
   "corepedia:visibility",
 ];
 const FORBIDDEN_HTML_PATTERNS = [
-  /<\s*(?:base|embed|footer|form|header|iframe|nav|object)\b/i,
+  /<\s*(?:a|base|embed|footer|form|header|iframe|nav|object)\b/i,
   /<\s*(?:link|script)\b[^>]+\b(?:href|src)\s*=/i,
   /\bhttp-equiv\s*=\s*["']?refresh/i,
   /\bon[a-z]+\s*=/i,
-  /\b(?:href|src|srcset|action|formaction)\s*=\s*["']\s*(?!data:image\/)/i,
+  /\b(?:href|src|srcset|action|formaction)\s*=\s*["']\s*(?!data:image\/|#)/i,
 ];
 const FORBIDDEN_SCRIPT_PATTERNS = [
   /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/,
@@ -96,6 +97,10 @@ const LIEFLAT_META_NAMES = [
   "lieflat-template",
   "lieflat-palette",
   "lieflat-source",
+] as const;
+const SOURCE_FIGURE_META_NAMES = [
+  "source-figure-profile",
+  "source-figure-sha256",
 ] as const;
 const REQUIRED_DESIGN_TOKENS = new Map([
   ["--ink", "#171716"],
@@ -187,6 +192,11 @@ type LieflatProfile = {
   template: string;
 };
 
+type SourceFigureProfile = {
+  colors: Set<string>;
+  identifier: string;
+};
+
 export type PublishedArtifactRuntime = ArtifactRuntimeIdentity & {
   bytes: number;
   global: string;
@@ -219,6 +229,14 @@ export type PublishedArtifact = ArtifactManifest & {
 let artifactCatalogCache: PublishedArtifact[] | null = null;
 let lieflatRegistryCache: LieflatRegistry | null = null;
 let runtimeRegistryCache: RuntimeRegistry | null = null;
+let sourceFigureRegistryCache: Record<
+  string,
+  {
+    allowedColors: string[];
+    sourcePath: string;
+    sourceSha256: string;
+  }
+> | null = null;
 
 export function getPublishedArtifacts(): PublishedArtifact[] {
   if (artifactCatalogCache) {
@@ -492,10 +510,10 @@ function loadArtifactForReference(
       `Artifact ${reference.id} exceeds ${manifest.budget.maxBytes} bytes`,
     );
   }
-  const lieflatProfile = validateArtifactHtml(html, manifest);
+  const profiles = validateArtifactHtml(html, manifest);
   const resolvedRuntime = resolveArtifactRuntime(
     manifest,
-    lieflatProfile,
+    profiles.lieflat,
     html,
   );
 
@@ -506,7 +524,10 @@ function loadArtifactForReference(
       throw new Error(`Unsafe artifact preview SVG: ${reference.id}`);
     }
     const allowedPreviewColors = new Set(ALLOWED_COLORS);
-    lieflatProfile?.colors.forEach((color) => allowedPreviewColors.add(color));
+    profiles.lieflat?.colors.forEach((color) => allowedPreviewColors.add(color));
+    profiles.sourceFigure?.colors.forEach((color) =>
+      allowedPreviewColors.add(color),
+    );
     const unknownPreviewColors = [...collectColors(source)].filter(
       (color) => !allowedPreviewColors.has(color),
     );
@@ -516,7 +537,7 @@ function loadArtifactForReference(
       );
     }
     if (
-      lieflatProfile &&
+      profiles.lieflat &&
       !/<rect\b(?=[^>]*\bfill=["']#f5f5f2["'])(?=[^>]*\b(?:width=["'](?:100%|1600)["']))(?=[^>]*\b(?:height=["'](?:100%|900)["']))[^>]*>/i.test(
         source,
       )
@@ -527,7 +548,7 @@ function loadArtifactForReference(
     }
   } else if (
     previewExtension !== ".png" ||
-    lieflatProfile ||
+    profiles.lieflat ||
     !previewContent.subarray(0, 8).equals(
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     )
@@ -668,7 +689,10 @@ function validateManifest(
 function validateArtifactHtml(
   source: string,
   manifest: ArtifactManifest,
-): LieflatProfile | null {
+): {
+  lieflat: LieflatProfile | null;
+  sourceFigure: SourceFigureProfile | null;
+} {
   if (!/<meta\b[^>]+http-equiv=["']Content-Security-Policy["']/i.test(source)) {
     throw new Error(`Artifact ${manifest.id} is missing a CSP meta tag`);
   }
@@ -687,8 +711,10 @@ function validateArtifactHtml(
     }
   }
   const lieflatProfile = parseLieflatProfile(source, manifest.id);
+  const sourceFigureProfile = parseSourceFigureProfile(source, manifest.id);
   const allowedColors = new Set(ALLOWED_COLORS);
   lieflatProfile?.colors.forEach((color) => allowedColors.add(color));
+  sourceFigureProfile?.colors.forEach((color) => allowedColors.add(color));
   const unknownColors = [...collectColors(source)].filter(
     (color) => !allowedColors.has(color),
   );
@@ -723,7 +749,10 @@ function validateArtifactHtml(
       }
     }
   }
-  return lieflatProfile;
+  return {
+    lieflat: lieflatProfile,
+    sourceFigure: sourceFigureProfile,
+  };
 }
 
 function normalizeColor(literal: string): string {
@@ -791,6 +820,111 @@ function loadLieflatRegistry(): LieflatRegistry {
   }
   lieflatRegistryCache = raw as LieflatRegistry;
   return lieflatRegistryCache;
+}
+
+function loadSourceFigureRegistry(): Record<
+  string,
+  {
+    allowedColors: string[];
+    sourcePath: string;
+    sourceSha256: string;
+  }
+> {
+  if (sourceFigureRegistryCache) {
+    return sourceFigureRegistryCache;
+  }
+  const registryPath = path.join(
+    getWikiRoot(),
+    "..",
+    ".trae",
+    "skills",
+    "corepedia-h5-artifact",
+    "references",
+    "source-figure-profiles.json",
+  );
+  const raw = JSON.parse(readFileSync(registryPath, "utf8")) as unknown;
+  if (
+    !isRecord(raw) ||
+    raw.schemaVersion !== 1 ||
+    !isRecord(raw.profiles)
+  ) {
+    throw new Error(`Invalid source figure registry: ${registryPath}`);
+  }
+  sourceFigureRegistryCache = raw.profiles as Record<
+    string,
+    {
+      allowedColors: string[];
+      sourcePath: string;
+      sourceSha256: string;
+    }
+  >;
+  return sourceFigureRegistryCache;
+}
+
+function parseSourceFigureProfile(
+  source: string,
+  artifactId: string,
+): SourceFigureProfile | null {
+  const values = new Map<string, string[]>();
+  for (const name of SOURCE_FIGURE_META_NAMES) {
+    const pattern = new RegExp(
+      `<meta\\b(?=[^>]*\\bname=["']${name}["'])(?=[^>]*\\bcontent=["']([^"']*)["'])[^>]*>`,
+      "gi",
+    );
+    values.set(name, [...source.matchAll(pattern)].map((match) => match[1]));
+  }
+  const present = [...values.values()].filter((found) => found.length > 0);
+  if (!present.length) {
+    return null;
+  }
+  if ([...values.values()].some((found) => found.length !== 1)) {
+    throw new Error(
+      `Artifact ${artifactId} has incomplete or duplicate source figure provenance`,
+    );
+  }
+  const identifier = values.get("source-figure-profile")![0];
+  const declaredSha = values.get("source-figure-sha256")![0];
+  const profile = loadSourceFigureRegistry()[identifier];
+  if (
+    !profile ||
+    !Array.isArray(profile.allowedColors) ||
+    typeof profile.sourcePath !== "string" ||
+    typeof profile.sourceSha256 !== "string" ||
+    !/^[0-9a-f]{64}$/.test(profile.sourceSha256) ||
+    declaredSha !== profile.sourceSha256
+  ) {
+    throw new Error(
+      `Artifact ${artifactId} uses an invalid source figure profile`,
+    );
+  }
+  const sourcePath = path.resolve(
+    getWikiRoot(),
+    profile.sourcePath.replace(/^wikis\//, ""),
+  );
+  const wikiRepoRoot = path.resolve(getWikiRoot(), "..");
+  const relative = path.relative(wikiRepoRoot, sourcePath);
+  if (
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative) ||
+    !existsSync(sourcePath) ||
+    !statSync(sourcePath).isFile()
+  ) {
+    throw new Error(
+      `Artifact ${artifactId} source figure is missing or escapes the wiki repo`,
+    );
+  }
+  const actualSha = createHash("sha256")
+    .update(readFileSync(sourcePath))
+    .digest("hex");
+  if (actualSha !== profile.sourceSha256) {
+    throw new Error(
+      `Artifact ${artifactId} source figure SHA-256 has changed`,
+    );
+  }
+  return {
+    colors: new Set(profile.allowedColors.map((color) => color.toLowerCase())),
+    identifier,
+  };
 }
 
 function loadRuntimeRegistry(): RuntimeRegistry {
