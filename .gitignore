@@ -22,6 +22,7 @@
 
 # production
 /build
+/public/artifact-runtimes/
 
 # misc
 .DS_Store

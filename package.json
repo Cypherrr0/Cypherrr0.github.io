@@ -3,12 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "node scripts/sync-artifact-runtimes.mjs",
+    "predev": "node scripts/sync-artifact-runtimes.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "echarts": "6.0.0",
     "geist": "^1.7.1",
     "gray-matter": "^4.0.3",
     "katex": "^0.16.22",

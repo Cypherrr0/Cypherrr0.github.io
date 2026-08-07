@@ -48,12 +48,16 @@ jobs:
           repository: Cypherrr0/corepedia
           token: ${{ steps.corepedia-token.outputs.token }}
           path: corepedia
-          sparse-checkout: wikis
+          sparse-checkout: |
+            wikis
+            .trae/skills/corepedia-h5-artifact/references
           persist-credentials: false
 
       - name: Verify Corepedia content
         run: |
           test -f corepedia/wikis/index.md
+          test -f corepedia/.trae/skills/corepedia-h5-artifact/references/lieflat-palettes.json
+          test -f corepedia/.trae/skills/corepedia-h5-artifact/references/runtime-registry.json
           find corepedia/wikis/tech corepedia/wikis/writing corepedia/wikis/learning \
             -type f -name '*.md' -print -quit | grep -q .
 

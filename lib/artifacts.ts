@@ -46,6 +46,7 @@ const ALLOWED_MANIFEST_FIELDS = new Set([
   "mobile",
   "network",
   "preview",
+  "runtime",
   "schemaVersion",
   "title",
 ]);
@@ -91,6 +92,11 @@ const ALLOWED_COLORS = new Set([
   "#ecece7",
   "#f5f5f2",
 ]);
+const LIEFLAT_META_NAMES = [
+  "lieflat-template",
+  "lieflat-palette",
+  "lieflat-source",
+] as const;
 const REQUIRED_DESIGN_TOKENS = new Map([
   ["--ink", "#171716"],
   ["--line", "#d8d8d2"],
@@ -98,6 +104,21 @@ const REQUIRED_DESIGN_TOKENS = new Map([
   ["--paper", "#f5f5f2"],
 ]);
 const HEX_COLOR_PATTERN = /#[0-9a-f]{3,8}\b/gi;
+const RGB_COLOR_PATTERN =
+  /rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*((?:0|1)(?:\.\d+)?|\.\d+))?\s*\)/gi;
+const CANVAS_BACKGROUND_PATTERN =
+  /(?:^|[},])\s*(?:html\s*,\s*body|body|html)\s*\{([^}]*)\}/gi;
+const BACKGROUND_DECLARATION_PATTERN =
+  /(?:^|;)\s*background(?:-color)?\s*:\s*([^;}{]+)/gi;
+const MOTION_DECLARATION_PATTERN =
+  /(?:animation|transition)(?:-(?:duration|delay))?\s*:\s*([^;}{]+)/gi;
+const TIME_PATTERN = /(\d+(?:\.\d+)?)(ms|s)\b/gi;
+const ECHARTS_DURATION_PATTERN =
+  /\banimation(?:Duration|Delay)(?:Update)?\s*:\s*(\d+(?:\.\d+)?)/g;
+const DYNAMIC_MOTION_PATTERN =
+  /(?:animation|transition)(?:-(?:duration|delay))?\s*:[^;}{]*\$\{/i;
+const CANVAS_SCRIPT_MUTATION_PATTERN =
+  /(?:document\s*\.\s*(?:body|documentElement)|document\s*\.\s*querySelector\s*\(\s*["'](?:body|html)["']\s*\))[\s\S]{0,100}?\.\s*(?:style\s*\.\s*)?background(?:Color)?\s*=/i;
 const SAFE_SVG_PATTERNS = [
   /<\s*(?:embed|foreignObject|iframe|object|script)\b/i,
   /\bon[a-z]+\s*=/i,
@@ -113,6 +134,12 @@ type ArtifactBudget = {
   maxBytes: number;
   maxControls: number;
   maxDomNodes: number;
+};
+
+export type ArtifactRuntimeIdentity = {
+  name: string;
+  profile: string;
+  version: string;
 };
 
 type ArtifactManifest = {
@@ -131,16 +158,9 @@ type ArtifactManifest = {
   mobile: "desktop-only" | "supported";
   network: [];
   preview: string;
+  runtime?: ArtifactRuntimeIdentity | null;
   schemaVersion: 1;
   title: string;
-};
-
-export type PublishedArtifact = ArtifactManifest & {
-  html: string;
-  manifestPath: string;
-  previewContent: Buffer;
-  previewContentType: "image/png" | "image/svg+xml";
-  sourceDocumentPath: string;
 };
 
 type ArtifactReference = {
@@ -148,7 +168,57 @@ type ArtifactReference = {
   id: string;
 };
 
+type LieflatRegistry = {
+  approvedTemplates: string[];
+  generator: "lieflat-charts";
+  paper: "#f5f5f2";
+  profiles: Record<string, { colors: string[] }>;
+  schemaVersion: 1;
+  source: {
+    profileRevision: string;
+    upstreamRevision: string;
+  };
+};
+
+type LieflatProfile = {
+  colors: Set<string>;
+  palette: string;
+  source: string;
+  template: string;
+};
+
+export type PublishedArtifactRuntime = ArtifactRuntimeIdentity & {
+  bytes: number;
+  global: string;
+  maxBytes: number;
+  publicPath: string;
+  sha256: string;
+};
+
+type RuntimeRegistry = {
+  runtimes: Array<
+    PublishedArtifactRuntime & {
+      allowedLieflatPalettes: string[];
+      allowedLieflatTemplates: string[];
+      license: string;
+      packageFile: string;
+    }
+  >;
+  schemaVersion: 1;
+};
+
+export type PublishedArtifact = ArtifactManifest & {
+  html: string;
+  manifestPath: string;
+  previewContent: Buffer;
+  previewContentType: "image/png" | "image/svg+xml";
+  resolvedRuntime: PublishedArtifactRuntime | null;
+  sourceDocumentPath: string;
+};
+
 let artifactCatalogCache: PublishedArtifact[] | null = null;
+let lieflatRegistryCache: LieflatRegistry | null = null;
+let runtimeRegistryCache: RuntimeRegistry | null = null;
 
 export function getPublishedArtifacts(): PublishedArtifact[] {
   if (artifactCatalogCache) {
@@ -435,7 +505,12 @@ function loadArtifactForReference(
       `Artifact ${reference.id} exceeds ${manifest.budget.maxBytes} bytes`,
     );
   }
-  validateArtifactHtml(html, manifest);
+  const lieflatProfile = validateArtifactHtml(html, manifest);
+  const resolvedRuntime = resolveArtifactRuntime(
+    manifest,
+    lieflatProfile,
+    html,
+  );
 
   const previewExtension = path.extname(previewPath).toLowerCase();
   if (previewExtension === ".svg") {
@@ -443,8 +518,29 @@ function loadArtifactForReference(
     if (SAFE_SVG_PATTERNS.some((pattern) => pattern.test(source))) {
       throw new Error(`Unsafe artifact preview SVG: ${reference.id}`);
     }
+    const allowedPreviewColors = new Set(ALLOWED_COLORS);
+    lieflatProfile?.colors.forEach((color) => allowedPreviewColors.add(color));
+    const unknownPreviewColors = [...collectColors(source)].filter(
+      (color) => !allowedPreviewColors.has(color),
+    );
+    if (unknownPreviewColors.length) {
+      throw new Error(
+        `Artifact preview ${reference.id} uses unapproved colors: ${unknownPreviewColors.join(", ")}`,
+      );
+    }
+    if (
+      lieflatProfile &&
+      !/<rect\b(?=[^>]*\bfill=["']#f5f5f2["'])(?=[^>]*\b(?:width=["'](?:100%|1600)["']))(?=[^>]*\b(?:height=["'](?:100%|900)["']))[^>]*>/i.test(
+        source,
+      )
+    ) {
+      throw new Error(
+        `Lieflat preview ${reference.id} must keep a full #f5f5f2 paper background`,
+      );
+    }
   } else if (
     previewExtension !== ".png" ||
+    lieflatProfile ||
     !previewContent.subarray(0, 8).equals(
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     )
@@ -462,6 +558,7 @@ function loadArtifactForReference(
     previewContent,
     previewContentType:
       previewExtension === ".svg" ? "image/svg+xml" : "image/png",
+    resolvedRuntime,
     sourceDocumentPath: reference.documentPath,
   };
 }
@@ -480,7 +577,7 @@ function validateManifest(
     (field) => !ALLOWED_MANIFEST_FIELDS.has(field),
   );
   const missingFields = [...ALLOWED_MANIFEST_FIELDS].filter(
-    (field) => !(field in value),
+    (field) => field !== "runtime" && !(field in value),
   );
   if (unknownFields.length || missingFields.length) {
     throw new Error(
@@ -538,6 +635,20 @@ function validateManifest(
     throw new Error(`Artifact capabilities invalid: ${manifestPath}`);
   }
   if (
+    value.runtime !== undefined &&
+    value.runtime !== null &&
+    (!isRecord(value.runtime) ||
+      Object.keys(value.runtime).sort().join(",") !== "name,profile,version" ||
+      typeof value.runtime.name !== "string" ||
+      !value.runtime.name ||
+      typeof value.runtime.profile !== "string" ||
+      !value.runtime.profile ||
+      typeof value.runtime.version !== "string" ||
+      !value.runtime.version)
+  ) {
+    throw new Error(`Artifact runtime identity invalid: ${manifestPath}`);
+  }
+  if (
     typeof value.entry !== "string" ||
     value.entry !== "dist/index.html" ||
     typeof value.preview !== "string" ||
@@ -570,7 +681,7 @@ function validateManifest(
 function validateArtifactHtml(
   source: string,
   manifest: ArtifactManifest,
-): void {
+): LieflatProfile | null {
   if (!/<meta\b[^>]+http-equiv=["']Content-Security-Policy["']/i.test(source)) {
     throw new Error(`Artifact ${manifest.id} is missing a CSP meta tag`);
   }
@@ -588,9 +699,12 @@ function validateArtifactHtml(
       throw new Error(`Artifact ${manifest.id} is missing design token ${token}`);
     }
   }
-  const unknownColors = [...new Set(source.match(HEX_COLOR_PATTERN) ?? [])]
-    .map((color) => color.toLowerCase())
-    .filter((color) => !ALLOWED_COLORS.has(color));
+  const lieflatProfile = parseLieflatProfile(source, manifest.id);
+  const allowedColors = new Set(ALLOWED_COLORS);
+  lieflatProfile?.colors.forEach((color) => allowedColors.add(color));
+  const unknownColors = [...collectColors(source)].filter(
+    (color) => !allowedColors.has(color),
+  );
   if (unknownColors.length) {
     throw new Error(
       `Artifact ${manifest.id} uses colors outside the Corepedia palette: ${unknownColors.join(", ")}`,
@@ -604,6 +718,373 @@ function validateArtifactHtml(
   }
   if (!source.includes("prefers-reduced-motion")) {
     throw new Error(`Artifact ${manifest.id} must respect reduced motion`);
+  }
+  validateCanvasPaper(source, manifest.id);
+  if (lieflatProfile) {
+    validateLieflatMotion(source, manifest.id);
+    if (CANVAS_SCRIPT_MUTATION_PATTERN.test(source)) {
+      throw new Error(
+        `Artifact ${manifest.id} may not change the html/body paper at runtime`,
+      );
+    }
+    const lowerSource = source.toLowerCase();
+    for (const token of ["tabindex", "aria-label", "keydown"]) {
+      if (!lowerSource.includes(token)) {
+        throw new Error(
+          `Artifact ${manifest.id} is missing Lieflat keyboard path token ${token}`,
+        );
+      }
+    }
+  }
+  return lieflatProfile;
+}
+
+function normalizeColor(literal: string): string {
+  const value = literal.toLowerCase().replace(/\s+/g, "");
+  if (value.startsWith("#")) {
+    if (value.length === 4) {
+      return `#${[...value.slice(1)].map((channel) => channel + channel).join("")}`;
+    }
+    return value;
+  }
+
+  const match =
+    /^rgba?\((\d+),(\d+),(\d+)(?:,((?:0|1)(?:\.\d+)?|\.\d+))?\)$/.exec(
+      value,
+    );
+  if (!match) {
+    throw new Error(`Unsupported artifact color: ${literal}`);
+  }
+  const channels = match.slice(1, 4).map(Number);
+  if (channels.some((channel) => channel > 255)) {
+    throw new Error(`Artifact RGB channel exceeds 255: ${literal}`);
+  }
+  return match[4] === undefined
+    ? `rgb(${channels.join(",")})`
+    : `rgba(${channels.join(",")},${Number(match[4])})`;
+}
+
+function collectColors(source: string): Set<string> {
+  const colors = new Set<string>();
+  for (const match of source.matchAll(HEX_COLOR_PATTERN)) {
+    colors.add(normalizeColor(match[0]));
+  }
+  for (const match of source.matchAll(RGB_COLOR_PATTERN)) {
+    colors.add(normalizeColor(match[0]));
+  }
+  return colors;
+}
+
+function loadLieflatRegistry(): LieflatRegistry {
+  if (lieflatRegistryCache) {
+    return lieflatRegistryCache;
+  }
+  const registryPath = path.join(
+    getWikiRoot(),
+    "..",
+    ".trae",
+    "skills",
+    "corepedia-h5-artifact",
+    "references",
+    "lieflat-palettes.json",
+  );
+  const raw = JSON.parse(readFileSync(registryPath, "utf8")) as unknown;
+  if (
+    !isRecord(raw) ||
+    raw.schemaVersion !== 1 ||
+    raw.generator !== "lieflat-charts" ||
+    raw.paper !== "#f5f5f2" ||
+    !Array.isArray(raw.approvedTemplates) ||
+    !isRecord(raw.profiles) ||
+    !isRecord(raw.source) ||
+    typeof raw.source.profileRevision !== "string" ||
+    typeof raw.source.upstreamRevision !== "string"
+  ) {
+    throw new Error(`Invalid Lieflat profile registry: ${registryPath}`);
+  }
+  lieflatRegistryCache = raw as LieflatRegistry;
+  return lieflatRegistryCache;
+}
+
+function loadRuntimeRegistry(): RuntimeRegistry {
+  if (runtimeRegistryCache) {
+    return runtimeRegistryCache;
+  }
+  const registryPath = path.join(
+    getWikiRoot(),
+    "..",
+    ".trae",
+    "skills",
+    "corepedia-h5-artifact",
+    "references",
+    "runtime-registry.json",
+  );
+  const raw = JSON.parse(readFileSync(registryPath, "utf8")) as unknown;
+  if (
+    !isRecord(raw) ||
+    raw.schemaVersion !== 1 ||
+    !Array.isArray(raw.runtimes)
+  ) {
+    throw new Error(`Invalid artifact runtime registry: ${registryPath}`);
+  }
+  const identities = new Set<string>();
+  for (const runtime of raw.runtimes) {
+    if (
+      !isRecord(runtime) ||
+      Object.keys(runtime).sort().join(",") !==
+        [
+          "allowedLieflatPalettes",
+          "allowedLieflatTemplates",
+          "bytes",
+          "global",
+          "license",
+          "maxBytes",
+          "name",
+          "packageFile",
+          "profile",
+          "publicPath",
+          "sha256",
+          "version",
+        ]
+          .sort()
+          .join(",") ||
+      typeof runtime.name !== "string" ||
+      typeof runtime.version !== "string" ||
+      typeof runtime.profile !== "string" ||
+      typeof runtime.global !== "string" ||
+      !runtime.global ||
+      typeof runtime.license !== "string" ||
+      !runtime.license ||
+      typeof runtime.packageFile !== "string" ||
+      !runtime.packageFile ||
+      typeof runtime.publicPath !== "string" ||
+      !/^\/artifact-runtimes\/[a-z0-9.-]+\.js$/.test(runtime.publicPath) ||
+      typeof runtime.sha256 !== "string" ||
+      !/^[0-9a-f]{64}$/.test(runtime.sha256) ||
+      !integerBetween(runtime.bytes, 1, 1_048_576) ||
+      !integerBetween(runtime.maxBytes, runtime.bytes, 1_048_576) ||
+      !Array.isArray(runtime.allowedLieflatTemplates) ||
+      !runtime.allowedLieflatTemplates.every(
+        (value) => typeof value === "string",
+      ) ||
+      !Array.isArray(runtime.allowedLieflatPalettes) ||
+      !runtime.allowedLieflatPalettes.every(
+        (value) => typeof value === "string",
+      )
+    ) {
+      throw new Error(`Invalid artifact runtime entry: ${registryPath}`);
+    }
+    const identity = `${runtime.name}/${runtime.version}/${runtime.profile}`;
+    if (identities.has(identity)) {
+      throw new Error(`Duplicate artifact runtime identity: ${identity}`);
+    }
+    identities.add(identity);
+  }
+  runtimeRegistryCache = raw as RuntimeRegistry;
+  return runtimeRegistryCache;
+}
+
+function resolveArtifactRuntime(
+  manifest: ArtifactManifest,
+  profile: LieflatProfile | null,
+  source: string,
+): PublishedArtifactRuntime | null {
+  const registry = loadRuntimeRegistry();
+  const runtimeIdentity = manifest.runtime ?? null;
+  const requiredTemplates = new Set(
+    registry.runtimes.flatMap(
+      (runtime) => runtime.allowedLieflatTemplates,
+    ),
+  );
+  if (!runtimeIdentity) {
+    if (profile && requiredTemplates.has(profile.template)) {
+      throw new Error(
+        `Artifact ${manifest.id} requires a registered runtime for ${profile.template}`,
+      );
+    }
+    if (/\becharts\b/.test(source)) {
+      throw new Error(
+        `Artifact ${manifest.id} uses echarts without declaring a runtime`,
+      );
+    }
+    return null;
+  }
+  const runtime = registry.runtimes.find(
+    (candidate) =>
+      candidate.name === runtimeIdentity.name &&
+      candidate.version === runtimeIdentity.version &&
+      candidate.profile === runtimeIdentity.profile,
+  );
+  if (!runtime) {
+    throw new Error(
+      `Artifact ${manifest.id} requests an unregistered runtime`,
+    );
+  }
+  if (!profile) {
+    throw new Error(
+      `Artifact ${manifest.id} runtime is limited to registered Lieflat charts`,
+    );
+  }
+  if (!runtime.allowedLieflatTemplates.includes(profile.template)) {
+    throw new Error(
+      `Artifact ${manifest.id} runtime is not approved for ${profile.template}`,
+    );
+  }
+  if (!runtime.allowedLieflatPalettes.includes(profile.palette)) {
+    throw new Error(
+      `Artifact ${manifest.id} runtime is not approved for ${profile.palette}`,
+    );
+  }
+  if (!new RegExp(`\\b${runtime.global}\\b`).test(source)) {
+    throw new Error(
+      `Artifact ${manifest.id} does not use runtime global ${runtime.global}`,
+    );
+  }
+  for (const token of [
+    "__corepediaSetChartPaused",
+    "__corepediaSetChartReducedMotion",
+    "getInstanceByDom",
+  ]) {
+    if (!source.includes(token)) {
+      throw new Error(
+        `Artifact ${manifest.id} is missing runtime lifecycle hook ${token}`,
+      );
+    }
+  }
+  return {
+    bytes: runtime.bytes,
+    global: runtime.global,
+    maxBytes: runtime.maxBytes,
+    name: runtime.name,
+    profile: runtime.profile,
+    publicPath: runtime.publicPath,
+    sha256: runtime.sha256,
+    version: runtime.version,
+  };
+}
+
+function parseLieflatProfile(
+  source: string,
+  artifactId: string,
+): LieflatProfile | null {
+  const values = new Map<string, string[]>();
+  for (const name of LIEFLAT_META_NAMES) {
+    const pattern = new RegExp(
+      `<meta\\b(?=[^>]*\\bname=["']${name}["'])(?=[^>]*\\bcontent=["']([^"']*)["'])[^>]*>`,
+      "gi",
+    );
+    values.set(name, [...source.matchAll(pattern)].map((match) => match[1]));
+  }
+  const present = [...values.entries()].filter(([, found]) => found.length > 0);
+  if (!present.length) {
+    return null;
+  }
+  const invalid = [...values.entries()].filter(([, found]) => found.length !== 1);
+  if (invalid.length) {
+    throw new Error(
+      `Artifact ${artifactId} has incomplete or duplicate Lieflat provenance`,
+    );
+  }
+
+  const registry = loadLieflatRegistry();
+  const template = values.get("lieflat-template")![0];
+  const palette = values.get("lieflat-palette")![0];
+  const revision = values.get("lieflat-source")![0];
+  if (!registry.approvedTemplates.includes(template)) {
+    throw new Error(`Artifact ${artifactId} uses unapproved Lieflat template ${template}`);
+  }
+  const profile = registry.profiles[palette];
+  if (!profile || !Array.isArray(profile.colors)) {
+    throw new Error(`Artifact ${artifactId} uses unregistered Lieflat palette ${palette}`);
+  }
+  if (revision !== registry.source.profileRevision) {
+    throw new Error(`Artifact ${artifactId} uses an unapproved Lieflat revision`);
+  }
+  return {
+    colors: new Set(profile.colors),
+    palette,
+    source: revision,
+    template,
+  };
+}
+
+function validateCanvasPaper(source: string, artifactId: string): void {
+  const paperVariables = new Set(
+    [...source.matchAll(/(--[a-z0-9-]+)\s*:\s*#f5f5f2\b/gi)].map(
+      (match) => match[1].toLowerCase(),
+    ),
+  );
+  const allowedBackgrounds = new Set([
+    "#f5f5f2",
+    ...[...paperVariables].map((name) => `var(${name})`),
+  ]);
+  const blocks = [...source.matchAll(CANVAS_BACKGROUND_PATTERN)].map(
+    (match) => match[1],
+  );
+  const backgrounds = blocks.flatMap((block) =>
+    [...block.matchAll(BACKGROUND_DECLARATION_PATTERN)].map((match) =>
+      match[1]
+        .toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/!important$/, ""),
+    ),
+  );
+  if (!backgrounds.length) {
+    throw new Error(`Artifact ${artifactId} must declare the html/body canvas paper`);
+  }
+  if (
+    backgrounds.some((background) => !allowedBackgrounds.has(background))
+  ) {
+    throw new Error(
+      `Artifact ${artifactId} must keep the html/body canvas on #f5f5f2`,
+    );
+  }
+  for (const match of source.matchAll(/<(?:html|body)\b[^>]*\bstyle=["']([^"']*)["']/gi)) {
+    const inlineBackgrounds = [...match[1].matchAll(BACKGROUND_DECLARATION_PATTERN)].map(
+      (background) =>
+        background[1]
+          .toLowerCase()
+          .replace(/\s+/g, "")
+          .replace(/!important$/, ""),
+    );
+    if (
+      !inlineBackgrounds.length ||
+      inlineBackgrounds.some(
+        (background) => !allowedBackgrounds.has(background),
+      )
+    ) {
+      throw new Error(
+        `Artifact ${artifactId} has an invalid inline html/body paper`,
+      );
+    }
+  }
+}
+
+function validateLieflatMotion(source: string, artifactId: string): void {
+  if (DYNAMIC_MOTION_PATTERN.test(source)) {
+    throw new Error(
+      `Artifact ${artifactId} has a dynamic Lieflat motion duration or delay`,
+    );
+  }
+  const excessive = new Set<string>();
+  for (const declaration of source.matchAll(MOTION_DECLARATION_PATTERN)) {
+    for (const duration of declaration[1].matchAll(TIME_PATTERN)) {
+      const milliseconds =
+        Number(duration[1]) * (duration[2].toLowerCase() === "s" ? 1000 : 1);
+      if (milliseconds > 420) {
+        excessive.add(duration[0]);
+      }
+    }
+  }
+  for (const duration of source.matchAll(ECHARTS_DURATION_PATTERN)) {
+    if (Number(duration[1]) > 420) {
+      excessive.add(`${duration[1]}ms`);
+    }
+  }
+  if (excessive.size) {
+    throw new Error(
+      `Artifact ${artifactId} has Lieflat motion over 420ms: ${[...excessive].join(", ")}`,
+    );
   }
 }
 
