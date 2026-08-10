@@ -40,10 +40,10 @@ const DOMAIN_META: Record<
 
 export function WikiSearch({ pages }: WikiSearchProps) {
   const [query, setQuery] = useState("");
-  const [activeDomain, setActiveDomain] = useState("learning");
+  const [activeDomain, setActiveDomain] = useState("");
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const visiblePages = useMemo(
-    () => pages.filter((page) => !isIndexPage(page)),
+    () => pages.filter((page) => !isIndexPage(page)).sort(comparePagesByUpdated),
     [pages],
   );
   const domains = useMemo(() => buildWikiTree(visiblePages), [visiblePages]);
@@ -56,8 +56,9 @@ export function WikiSearch({ pages }: WikiSearchProps) {
       page.searchText.toLocaleLowerCase("zh-CN").includes(normalizedQuery),
     );
   }, [normalizedQuery, visiblePages]);
-  const selectedDomain =
-    domains.find((domain) => domain.segment === activeDomain) || domains[0];
+  const selectedDomain = domains.find(
+    (domain) => domain.segment === activeDomain,
+  );
 
   return (
     <section aria-labelledby="wiki-pages" className="wiki-index">
@@ -68,7 +69,9 @@ export function WikiSearch({ pages }: WikiSearchProps) {
           <p aria-live="polite" className="muted">
             {normalizedQuery
               ? `找到 ${results.length} 个结果`
-              : `${domains.length} 个知识域，共 ${visiblePages.length} 个公开页面`}
+              : selectedDomain
+                ? `${domainMeta(selectedDomain.segment).title}，${countPages(selectedDomain)} 页`
+                : `最新更新，共 ${visiblePages.length} 个公开页面`}
           </p>
         </div>
         <label className="search">
@@ -97,11 +100,27 @@ export function WikiSearch({ pages }: WikiSearchProps) {
       ) : (
         <>
           <KnowledgeGraph
-            activeDomain={selectedDomain?.segment || activeDomain}
+            activeDomain={selectedDomain?.segment || ""}
             pages={visiblePages}
           />
 
           <div aria-label="知识域" className="domain-nav" role="tablist">
+            <button
+              aria-controls="domain-panel-latest"
+              aria-selected={!selectedDomain}
+              className={!selectedDomain ? "is-active" : undefined}
+              id="domain-tab-latest"
+              onKeyDown={(event) =>
+                handleDomainKeyDown(event, "", domains, setActiveDomain)
+              }
+              onClick={() => setActiveDomain("")}
+              role="tab"
+              tabIndex={!selectedDomain ? 0 : -1}
+              type="button"
+            >
+              <span>最新</span>
+              <small>{visiblePages.length}</small>
+            </button>
             {domains.map((domain) => {
               const meta = domainMeta(domain.segment);
               const isActive = domain.segment === selectedDomain?.segment;
@@ -133,10 +152,39 @@ export function WikiSearch({ pages }: WikiSearchProps) {
           </div>
 
           <div className="domain-list">
-            {selectedDomain ? <DomainSection node={selectedDomain} /> : null}
+            {selectedDomain ? (
+              <DomainSection node={selectedDomain} />
+            ) : (
+              <LatestSection pages={visiblePages} />
+            )}
           </div>
         </>
       )}
+    </section>
+  );
+}
+
+function LatestSection({ pages }: { pages: WikiPageSummary[] }) {
+  return (
+    <section
+      aria-labelledby="domain-tab-latest"
+      className="domain-section"
+      id="domain-panel-latest"
+      role="tabpanel"
+      tabIndex={0}
+    >
+      <header className="domain-header">
+        <div>
+          <p className="eyebrow">Latest</p>
+          <h3>最近更新</h3>
+          <p>按页面的更新时间倒序排列。</p>
+        </div>
+        <span className="page-count">{pages.length} 页</span>
+      </header>
+
+      <div className="domain-content">
+        <PageLinkList pages={pages} />
+      </div>
     </section>
   );
 }
@@ -198,8 +246,9 @@ function PageLinkList({
   pages: WikiPageSummary[];
   title?: string;
 }) {
-  const visiblePages = pages.slice(0, 3);
-  const hiddenPages = pages.slice(3);
+  const sortedPages = [...pages].sort(comparePagesByUpdated);
+  const visiblePages = sortedPages.slice(0, 3);
+  const hiddenPages = sortedPages.slice(3);
 
   return (
     <div className="topic-pages">
@@ -338,8 +387,28 @@ function countPages(node: WikiNode): number {
 
 function sortedChildren(node: WikiNode): WikiNode[] {
   return [...node.children.values()].sort((left, right) => {
-    return left.segment.localeCompare(right.segment, "zh-CN");
+    return (
+      latestUpdated(right).localeCompare(latestUpdated(left)) ||
+      left.segment.localeCompare(right.segment, "zh-CN")
+    );
   });
+}
+
+function latestUpdated(node: WikiNode): string {
+  return [
+    ...node.directPages.map((page) => page.updated),
+    ...[...node.children.values()].map(latestUpdated),
+  ].reduce((latest, updated) => (updated > latest ? updated : latest), "");
+}
+
+function comparePagesByUpdated(
+  left: WikiPageSummary,
+  right: WikiPageSummary,
+) {
+  return (
+    right.updated.localeCompare(left.updated) ||
+    left.title.localeCompare(right.title, "zh-CN")
+  );
 }
 
 function domainMeta(segment: string) {
@@ -369,25 +438,26 @@ function handleDomainKeyDown(
   domains: WikiNode[],
   selectDomain: (domain: string) => void,
 ) {
-  const currentIndex = domains.findIndex(
-    (domain) => domain.segment === currentDomain,
-  );
+  const domainIds = ["", ...domains.map((domain) => domain.segment)];
+  const currentIndex = domainIds.indexOf(currentDomain);
   let nextIndex = currentIndex;
 
   if (event.key === "ArrowRight") {
-    nextIndex = (currentIndex + 1) % domains.length;
+    nextIndex = (currentIndex + 1) % domainIds.length;
   } else if (event.key === "ArrowLeft") {
-    nextIndex = (currentIndex - 1 + domains.length) % domains.length;
+    nextIndex = (currentIndex - 1 + domainIds.length) % domainIds.length;
   } else if (event.key === "Home") {
     nextIndex = 0;
   } else if (event.key === "End") {
-    nextIndex = domains.length - 1;
+    nextIndex = domainIds.length - 1;
   } else {
     return;
   }
 
   event.preventDefault();
-  const nextDomain = domains[nextIndex];
-  selectDomain(nextDomain.segment);
-  document.getElementById(`domain-tab-${nextDomain.segment}`)?.focus();
+  const nextDomain = domainIds[nextIndex];
+  selectDomain(nextDomain);
+  document
+    .getElementById(nextDomain ? `domain-tab-${nextDomain}` : "domain-tab-latest")
+    ?.focus();
 }
