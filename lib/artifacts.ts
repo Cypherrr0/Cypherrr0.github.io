@@ -98,6 +98,10 @@ const LIEFLAT_META_NAMES = [
   "lieflat-palette",
   "lieflat-source",
 ] as const;
+const LIEFLAT_PALETTE_META_NAMES = [
+  "lieflat-palette-profile",
+  "lieflat-palette-source",
+] as const;
 const SOURCE_FIGURE_META_NAMES = [
   "source-figure-profile",
   "source-figure-sha256",
@@ -189,7 +193,7 @@ type LieflatProfile = {
   colors: Set<string>;
   palette: string;
   source: string;
-  template: string;
+  template: string | null;
 };
 
 type SourceFigureProfile = {
@@ -1018,7 +1022,7 @@ function resolveArtifactRuntime(
     ),
   );
   if (!runtimeIdentity) {
-    if (profile && requiredTemplates.has(profile.template)) {
+    if (profile?.template && requiredTemplates.has(profile.template)) {
       throw new Error(
         `Artifact ${manifest.id} requires a registered runtime for ${profile.template}`,
       );
@@ -1044,6 +1048,11 @@ function resolveArtifactRuntime(
   if (!profile) {
     throw new Error(
       `Artifact ${manifest.id} runtime is limited to registered Lieflat charts`,
+    );
+  }
+  if (!profile.template) {
+    throw new Error(
+      `Artifact ${manifest.id} palette-only profile may not declare a runtime`,
     );
   }
   if (!runtime.allowedLieflatTemplates.includes(profile.template)) {
@@ -1088,18 +1097,34 @@ function parseLieflatProfile(
   source: string,
   artifactId: string,
 ): LieflatProfile | null {
-  const values = new Map<string, string[]>();
-  for (const name of LIEFLAT_META_NAMES) {
-    const pattern = new RegExp(
-      `<meta\\b(?=[^>]*\\bname=["']${name}["'])(?=[^>]*\\bcontent=["']([^"']*)["'])[^>]*>`,
-      "gi",
+  const readValues = (names: readonly string[]) => {
+    const values = new Map<string, string[]>();
+    for (const name of names) {
+      const pattern = new RegExp(
+        `<meta\\b(?=[^>]*\\bname=["']${name}["'])(?=[^>]*\\bcontent=["']([^"']*)["'])[^>]*>`,
+        "gi",
+      );
+      values.set(name, [...source.matchAll(pattern)].map((match) => match[1]));
+    }
+    return values;
+  };
+  const templateValues = readValues(LIEFLAT_META_NAMES);
+  const paletteValues = readValues(LIEFLAT_PALETTE_META_NAMES);
+  const templatePresent = [...templateValues.values()].some(
+    (found) => found.length > 0,
+  );
+  const palettePresent = [...paletteValues.values()].some(
+    (found) => found.length > 0,
+  );
+  if (templatePresent && palettePresent) {
+    throw new Error(
+      `Artifact ${artifactId} combines template and palette-only provenance`,
     );
-    values.set(name, [...source.matchAll(pattern)].map((match) => match[1]));
   }
-  const present = [...values.entries()].filter(([, found]) => found.length > 0);
-  if (!present.length) {
+  if (!templatePresent && !palettePresent) {
     return null;
   }
+  const values = templatePresent ? templateValues : paletteValues;
   const invalid = [...values.entries()].filter(([, found]) => found.length !== 1);
   if (invalid.length) {
     throw new Error(
@@ -1108,10 +1133,14 @@ function parseLieflatProfile(
   }
 
   const registry = loadLieflatRegistry();
-  const template = values.get("lieflat-template")![0];
-  const palette = values.get("lieflat-palette")![0];
-  const revision = values.get("lieflat-source")![0];
-  if (!registry.approvedTemplates.includes(template)) {
+  const template = templatePresent ? values.get("lieflat-template")![0] : null;
+  const palette = templatePresent
+    ? values.get("lieflat-palette")![0]
+    : values.get("lieflat-palette-profile")![0];
+  const revision = templatePresent
+    ? values.get("lieflat-source")![0]
+    : values.get("lieflat-palette-source")![0];
+  if (template && !registry.approvedTemplates.includes(template)) {
     throw new Error(`Artifact ${artifactId} uses unapproved Lieflat template ${template}`);
   }
   const profile = registry.profiles[palette];
