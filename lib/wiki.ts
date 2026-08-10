@@ -10,6 +10,7 @@ import path from "node:path";
 import matter from "gray-matter";
 import type { Image, Link, PhrasingContent, Root, Text } from "mdast";
 import type { InlineMath, Math } from "mdast-util-math";
+import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
@@ -720,6 +721,7 @@ async function renderMarkdown(
     .use(localMediaPlugin(documentPath))
     .use(remarkRehype)
     .use(rehypeKatex)
+    .use(rehypeHighlight, { detect: true })
     .use(linkMetadataPlugin())
     .use(mediaStatusPlugin())
     .use(rehypeSlug)

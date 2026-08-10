@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { GeistMono } from "geist/font/mono";
 import localFont from "next/font/local";
+import "highlight.js/styles/github.css";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import "./redesign.css";
