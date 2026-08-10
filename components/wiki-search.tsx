@@ -16,7 +16,6 @@ type WikiNode = {
   segment: string;
 };
 
-const DOMAIN_ORDER = ["learning", "tech", "writing"];
 const DOMAIN_META: Record<
   string,
   { description: string; eyebrow: string; title: string }
@@ -56,9 +55,8 @@ export function WikiSearch({ pages }: WikiSearchProps) {
       page.searchText.toLocaleLowerCase("zh-CN").includes(normalizedQuery),
     );
   }, [normalizedQuery, visiblePages]);
-  const selectedDomain = domains.find(
-    (domain) => domain.segment === activeDomain,
-  );
+  const selectedDomain =
+    domains.find((domain) => domain.segment === activeDomain) || domains[0];
 
   return (
     <section aria-labelledby="wiki-pages" className="wiki-index">
@@ -69,9 +67,7 @@ export function WikiSearch({ pages }: WikiSearchProps) {
           <p aria-live="polite" className="muted">
             {normalizedQuery
               ? `找到 ${results.length} 个结果`
-              : selectedDomain
-                ? `${domainMeta(selectedDomain.segment).title}，${countPages(selectedDomain)} 页`
-                : `最新更新，共 ${visiblePages.length} 个公开页面`}
+              : `${domainMeta(selectedDomain.segment).title}，${countPages(selectedDomain)} 页`}
           </p>
         </div>
         <label className="search">
@@ -100,27 +96,11 @@ export function WikiSearch({ pages }: WikiSearchProps) {
       ) : (
         <>
           <KnowledgeGraph
-            activeDomain={selectedDomain?.segment || ""}
+            activeDomain={selectedDomain?.segment || activeDomain}
             pages={visiblePages}
           />
 
           <div aria-label="知识域" className="domain-nav" role="tablist">
-            <button
-              aria-controls="domain-panel-latest"
-              aria-selected={!selectedDomain}
-              className={!selectedDomain ? "is-active" : undefined}
-              id="domain-tab-latest"
-              onKeyDown={(event) =>
-                handleDomainKeyDown(event, "", domains, setActiveDomain)
-              }
-              onClick={() => setActiveDomain("")}
-              role="tab"
-              tabIndex={!selectedDomain ? 0 : -1}
-              type="button"
-            >
-              <span>最新</span>
-              <small>{visiblePages.length}</small>
-            </button>
             {domains.map((domain) => {
               const meta = domainMeta(domain.segment);
               const isActive = domain.segment === selectedDomain?.segment;
@@ -152,39 +132,10 @@ export function WikiSearch({ pages }: WikiSearchProps) {
           </div>
 
           <div className="domain-list">
-            {selectedDomain ? (
-              <DomainSection node={selectedDomain} />
-            ) : (
-              <LatestSection pages={visiblePages} />
-            )}
+            {selectedDomain ? <DomainSection node={selectedDomain} /> : null}
           </div>
         </>
       )}
-    </section>
-  );
-}
-
-function LatestSection({ pages }: { pages: WikiPageSummary[] }) {
-  return (
-    <section
-      aria-labelledby="domain-tab-latest"
-      className="domain-section"
-      id="domain-panel-latest"
-      role="tabpanel"
-      tabIndex={0}
-    >
-      <header className="domain-header">
-        <div>
-          <p className="eyebrow">Latest</p>
-          <h3>最近更新</h3>
-          <p>按页面的更新时间倒序排列。</p>
-        </div>
-        <span className="page-count">{pages.length} 页</span>
-      </header>
-
-      <div className="domain-content">
-        <PageLinkList pages={pages} />
-      </div>
     </section>
   );
 }
@@ -210,31 +161,8 @@ function DomainSection({ node }: { node: WikiNode }) {
       </header>
 
       <div className="domain-content">
-        {node.directPages.length ? (
-          <PageLinkList pages={node.directPages} title="本域专题" />
-        ) : null}
-        {sortedChildren(node).map((child) => (
-          <TopicSection depth={1} key={child.segment} node={child} />
-        ))}
+        <PageLinkList pages={collectPages(node)} />
       </div>
-    </section>
-  );
-}
-
-function TopicSection({ depth, node }: { depth: number; node: WikiNode }) {
-  const title = formatSegment(node.segment);
-  const Heading = depth === 1 ? "h4" : "h5";
-
-  return (
-    <section className={`topic-section topic-depth-${depth}`}>
-      <header className="topic-header">
-        <Heading>{title}</Heading>
-        <span>{countPages(node)} 页</span>
-      </header>
-      {node.directPages.length ? <PageLinkList pages={node.directPages} /> : null}
-      {sortedChildren(node).map((child) => (
-        <TopicSection depth={depth + 1} key={child.segment} node={child} />
-      ))}
     </section>
   );
 }
@@ -345,11 +273,8 @@ function buildWikiTree(pages: WikiPageSummary[]): WikiNode[] {
   }
 
   return [...roots.values()].sort((left, right) => {
-    const leftIndex = DOMAIN_ORDER.indexOf(left.segment);
-    const rightIndex = DOMAIN_ORDER.indexOf(right.segment);
     return (
-      (leftIndex === -1 ? DOMAIN_ORDER.length : leftIndex) -
-        (rightIndex === -1 ? DOMAIN_ORDER.length : rightIndex) ||
+      latestUpdated(right).localeCompare(latestUpdated(left)) ||
       left.segment.localeCompare(right.segment, "zh-CN")
     );
   });
@@ -385,13 +310,11 @@ function countPages(node: WikiNode): number {
   );
 }
 
-function sortedChildren(node: WikiNode): WikiNode[] {
-  return [...node.children.values()].sort((left, right) => {
-    return (
-      latestUpdated(right).localeCompare(latestUpdated(left)) ||
-      left.segment.localeCompare(right.segment, "zh-CN")
-    );
-  });
+function collectPages(node: WikiNode): WikiPageSummary[] {
+  return [
+    ...node.directPages,
+    ...[...node.children.values()].flatMap(collectPages),
+  ].sort(comparePagesByUpdated);
 }
 
 function latestUpdated(node: WikiNode): string {
@@ -438,26 +361,25 @@ function handleDomainKeyDown(
   domains: WikiNode[],
   selectDomain: (domain: string) => void,
 ) {
-  const domainIds = ["", ...domains.map((domain) => domain.segment)];
-  const currentIndex = domainIds.indexOf(currentDomain);
+  const currentIndex = domains.findIndex(
+    (domain) => domain.segment === currentDomain,
+  );
   let nextIndex = currentIndex;
 
   if (event.key === "ArrowRight") {
-    nextIndex = (currentIndex + 1) % domainIds.length;
+    nextIndex = (currentIndex + 1) % domains.length;
   } else if (event.key === "ArrowLeft") {
-    nextIndex = (currentIndex - 1 + domainIds.length) % domainIds.length;
+    nextIndex = (currentIndex - 1 + domains.length) % domains.length;
   } else if (event.key === "Home") {
     nextIndex = 0;
   } else if (event.key === "End") {
-    nextIndex = domainIds.length - 1;
+    nextIndex = domains.length - 1;
   } else {
     return;
   }
 
   event.preventDefault();
-  const nextDomain = domainIds[nextIndex];
-  selectDomain(nextDomain);
-  document
-    .getElementById(nextDomain ? `domain-tab-${nextDomain}` : "domain-tab-latest")
-    ?.focus();
+  const nextDomain = domains[nextIndex];
+  selectDomain(nextDomain.segment);
+  document.getElementById(`domain-tab-${nextDomain.segment}`)?.focus();
 }
