@@ -16,6 +16,9 @@ type WikiNode = {
   segment: string;
 };
 
+const LEETCODE_INDEX_PATH = "learning/algorithms/index.md";
+const LEETCODE_PATH_PREFIX = "learning/algorithms/";
+
 const DOMAIN_META: Record<
   string,
   { description: string; eyebrow: string; title: string }
@@ -41,20 +44,24 @@ export function WikiSearch({ pages }: WikiSearchProps) {
   const [query, setQuery] = useState("");
   const [activeDomain, setActiveDomain] = useState("");
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
-  const visiblePages = useMemo(
+  const searchablePages = useMemo(
     () => pages.filter((page) => !isIndexPage(page)).sort(comparePagesByUpdated),
     [pages],
   );
-  const domains = useMemo(() => buildWikiTree(visiblePages), [visiblePages]);
+  const navigationPages = useMemo(() => buildNavigationPages(pages), [pages]);
+  const domains = useMemo(
+    () => buildWikiTree(navigationPages),
+    [navigationPages],
+  );
   const results = useMemo(() => {
     if (!normalizedQuery) {
-      return visiblePages;
+      return searchablePages;
     }
 
-    return visiblePages.filter((page) =>
+    return searchablePages.filter((page) =>
       page.searchText.toLocaleLowerCase("zh-CN").includes(normalizedQuery),
     );
-  }, [normalizedQuery, visiblePages]);
+  }, [normalizedQuery, searchablePages]);
   const selectedDomain =
     domains.find((domain) => domain.segment === activeDomain) || domains[0];
 
@@ -97,7 +104,7 @@ export function WikiSearch({ pages }: WikiSearchProps) {
         <>
           <KnowledgeGraph
             activeDomain={selectedDomain?.segment || activeDomain}
-            pages={visiblePages}
+            pages={navigationPages}
           />
 
           <div aria-label="知识域" className="domain-nav" role="tablist">
@@ -353,6 +360,35 @@ function formatSegment(segment: string): string {
 
 function isIndexPage(page: WikiPageSummary) {
   return page.path.endsWith("/index.md");
+}
+
+function buildNavigationPages(pages: WikiPageSummary[]): WikiPageSummary[] {
+  const leetCodePages = pages.filter(
+    (page) =>
+      page.path.startsWith(LEETCODE_PATH_PREFIX) &&
+      page.path !== LEETCODE_INDEX_PATH,
+  );
+  const latestLeetCodeUpdate = leetCodePages.reduce(
+    (latest, page) => (page.updated > latest ? page.updated : latest),
+    "",
+  );
+
+  return pages
+    .filter(
+      (page) =>
+        page.path === LEETCODE_INDEX_PATH ||
+        (!isIndexPage(page) && !page.path.startsWith(LEETCODE_PATH_PREFIX)),
+    )
+    .map((page) =>
+      page.path === LEETCODE_INDEX_PATH
+        ? {
+            ...page,
+            title: "LeetCode 热题 100",
+            updated: latestLeetCodeUpdate || page.updated,
+          }
+        : page,
+    )
+    .sort(comparePagesByUpdated);
 }
 
 function handleDomainKeyDown(
