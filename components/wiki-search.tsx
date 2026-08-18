@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { KnowledgeGraph } from "@/components/knowledge-graph";
 import type { WikiPageSummary } from "@/lib/wiki";
+import {
+  buildWikiNavigationPages,
+  isIndexPage,
+} from "@/lib/wiki-navigation";
 
 type WikiSearchProps = {
   pages: WikiPageSummary[];
@@ -15,9 +19,6 @@ type WikiNode = {
   path: string[];
   segment: string;
 };
-
-const LEETCODE_INDEX_PATH = "learning/algorithms/index.md";
-const LEETCODE_PATH_PREFIX = "learning/algorithms/";
 
 const DOMAIN_META: Record<
   string,
@@ -48,7 +49,10 @@ export function WikiSearch({ pages }: WikiSearchProps) {
     () => pages.filter((page) => !isIndexPage(page)).sort(comparePagesByUpdated),
     [pages],
   );
-  const navigationPages = useMemo(() => buildNavigationPages(pages), [pages]);
+  const navigationPages = useMemo(
+    () => buildWikiNavigationPages(pages),
+    [pages],
+  );
   const domains = useMemo(
     () => buildWikiTree(navigationPages),
     [navigationPages],
@@ -161,7 +165,9 @@ function DomainSection({ node }: { node: WikiNode }) {
       <header className="domain-header">
         <div>
           <p className="eyebrow">{meta.eyebrow}</p>
-          <h3>{meta.title}</h3>
+          <h3>
+            <Link href={`/wiki/${node.segment}/`}>{meta.title}</Link>
+          </h3>
           <p>{meta.description}</p>
         </div>
         <span className="page-count">{countPages(node)} 页</span>
@@ -356,39 +362,6 @@ function formatSegment(segment: string): string {
     .split("-")
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
     .join(" ");
-}
-
-function isIndexPage(page: WikiPageSummary) {
-  return page.path.endsWith("/index.md");
-}
-
-function buildNavigationPages(pages: WikiPageSummary[]): WikiPageSummary[] {
-  const leetCodePages = pages.filter(
-    (page) =>
-      page.path.startsWith(LEETCODE_PATH_PREFIX) &&
-      page.path !== LEETCODE_INDEX_PATH,
-  );
-  const latestLeetCodeUpdate = leetCodePages.reduce(
-    (latest, page) => (page.updated > latest ? page.updated : latest),
-    "",
-  );
-
-  return pages
-    .filter(
-      (page) =>
-        page.path === LEETCODE_INDEX_PATH ||
-        (!isIndexPage(page) && !page.path.startsWith(LEETCODE_PATH_PREFIX)),
-    )
-    .map((page) =>
-      page.path === LEETCODE_INDEX_PATH
-        ? {
-            ...page,
-            title: "LeetCode 热题 100",
-            updated: latestLeetCodeUpdate || page.updated,
-          }
-        : page,
-    )
-    .sort(comparePagesByUpdated);
 }
 
 function handleDomainKeyDown(

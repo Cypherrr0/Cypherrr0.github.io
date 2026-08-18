@@ -23,6 +23,12 @@ import { visit } from "unist-util-visit";
 import { artifactMarkdownPlugin } from "@/lib/artifacts";
 
 const PUBLIC_ROOTS = new Set(["learning", "tech", "writing"]);
+const FRONTEND_INDEX_PATHS = new Set([
+  "learning/index.md",
+  "learning/algorithms/index.md",
+  "tech/index.md",
+  "writing/index.md",
+]);
 const FRAGMENT_ROOT = "fragments";
 const WIKI_LINK_PATTERN =
   /!?\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g;
@@ -384,6 +390,12 @@ function parseWikiDocument(
   const [root] = relativePath.split("/");
 
   if (!PUBLIC_ROOTS.has(root)) {
+    return null;
+  }
+  if (
+    relativePath.endsWith("/index.md") &&
+    !FRONTEND_INDEX_PATHS.has(relativePath)
+  ) {
     return null;
   }
 

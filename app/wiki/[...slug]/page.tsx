@@ -9,10 +9,16 @@ import {
   getWikiPages,
   type AlgorithmCatalogSection,
 } from "@/lib/wiki";
+import { buildWikiNavigationPages } from "@/lib/wiki-navigation";
 
 export const dynamicParams = false;
 const UNAVAILABLE_SLUG = ["unavailable"];
 const ALGORITHM_INDEX_ROUTE = "learning/algorithms";
+const DOMAIN_TITLES: Record<string, string> = {
+  learning: "学习",
+  tech: "技术",
+  writing: "写作",
+};
 
 type WikiPageProps = {
   params: Promise<{ slug: string[] }>;
@@ -34,6 +40,13 @@ export async function generateMetadata({
 
   if (!page) {
     return {};
+  }
+
+  if (slug.length === 1 && DOMAIN_TITLES[slug[0]]) {
+    return {
+      description: `${DOMAIN_TITLES[slug[0]]}知识目录。`,
+      title: DOMAIN_TITLES[slug[0]],
+    };
   }
 
   if (slug.join("/") === ALGORITHM_INDEX_ROUTE) {
@@ -74,6 +87,13 @@ export default async function WikiPage({ params }: WikiPageProps) {
     }
 
     notFound();
+  }
+
+  if (slug.length === 1 && DOMAIN_TITLES[slug[0]]) {
+    const domainPages = buildWikiNavigationPages(getWikiPages()).filter(
+      (candidate) => candidate.slug[0] === slug[0],
+    );
+    return <DomainIndex domain={slug[0]} pages={domainPages} />;
   }
 
   if (slug.join("/") === ALGORITHM_INDEX_ROUTE) {
@@ -159,6 +179,62 @@ export default async function WikiPage({ params }: WikiPageProps) {
               className="wiki-content"
               dangerouslySetInnerHTML={{ __html: page.html }}
             />
+          </div>
+        </div>
+      </article>
+    </main>
+  );
+}
+
+function DomainIndex({
+  domain,
+  pages,
+}: {
+  domain: string;
+  pages: ReturnType<typeof getWikiPages>;
+}) {
+  const title = DOMAIN_TITLES[domain] || domain;
+
+  return (
+    <main className="article-shell" id="main-content" tabIndex={-1}>
+      <nav aria-label="面包屑" className="breadcrumbs">
+        <Link href="/">C/P</Link>
+        <span aria-hidden="true">/</span>
+        <Link href="/wiki/">Wiki</Link>
+        <span aria-hidden="true">/</span>
+        <span>{domain}</span>
+      </nav>
+
+      <article className="wiki-article">
+        <header className="article-header">
+          <div className="article-header-copy">
+            <p className="eyebrow">Corepedia / Domain</p>
+            <h1>{title}</h1>
+          </div>
+        </header>
+
+        <div className="article-grid">
+          <aside className="article-rail" aria-label="目录信息">
+            <div className="article-rail-meta">
+              <span>{domain}</span>
+              <span>{pages.length} pages</span>
+            </div>
+          </aside>
+          <div className="article-main">
+            <div className="topic-pages">
+              <ul>
+                {pages.map((item) => (
+                  <li key={item.path}>
+                    <Link href={`/wiki/${item.slug.join("/")}/`}>
+                      {item.title}
+                    </Link>
+                    {item.updated ? (
+                      <time dateTime={item.updated}>{item.updated}</time>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </article>
