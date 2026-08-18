@@ -3,10 +3,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArticleOutline } from "@/components/article-outline";
-import { getWikiPageBySlug, getWikiPages } from "@/lib/wiki";
+import {
+  getAlgorithmCatalog,
+  getWikiPageBySlug,
+  getWikiPages,
+  type AlgorithmCatalogSection,
+} from "@/lib/wiki";
 
 export const dynamicParams = false;
 const UNAVAILABLE_SLUG = ["unavailable"];
+const ALGORITHM_INDEX_ROUTE = "learning/algorithms";
 
 type WikiPageProps = {
   params: Promise<{ slug: string[] }>;
@@ -23,10 +29,18 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: WikiPageProps): Promise<Metadata> {
-  const page = await getWikiPageBySlug((await params).slug);
+  const { slug } = await params;
+  const page = await getWikiPageBySlug(slug);
 
   if (!page) {
     return {};
+  }
+
+  if (slug.join("/") === ALGORITHM_INDEX_ROUTE) {
+    return {
+      description: "LeetCode 热题 100，按 17 个算法章节整理。",
+      title: "LeetCode 热题 100",
+    };
   }
 
   return {
@@ -60,6 +74,10 @@ export default async function WikiPage({ params }: WikiPageProps) {
     }
 
     notFound();
+  }
+
+  if (slug.join("/") === ALGORITHM_INDEX_ROUTE) {
+    return <AlgorithmIndex sections={getAlgorithmCatalog()} />;
   }
 
   return (
@@ -142,6 +160,65 @@ export default async function WikiPage({ params }: WikiPageProps) {
               dangerouslySetInnerHTML={{ __html: page.html }}
             />
           </div>
+        </div>
+      </article>
+    </main>
+  );
+}
+
+function AlgorithmIndex({ sections }: { sections: AlgorithmCatalogSection[] }) {
+  const questionCount = sections.reduce(
+    (total, section) => total + section.questions.length,
+    0,
+  );
+
+  return (
+    <main className="article-shell" id="main-content" tabIndex={-1}>
+      <nav aria-label="面包屑" className="breadcrumbs">
+        <Link href="/">C/P</Link>
+        <span aria-hidden="true">/</span>
+        <Link href="/wiki/">Wiki</Link>
+        <span aria-hidden="true">/</span>
+        <span>learning / algorithms</span>
+      </nav>
+
+      <article className="algorithm-index">
+        <header className="algorithm-index-header">
+          <p className="eyebrow">Learning / Algorithms</p>
+          <h1>LeetCode 热题 100</h1>
+          <p className="algorithm-index-count">
+            <span>17 章</span>
+            <span>{questionCount} 题</span>
+          </p>
+        </header>
+
+        <div className="algorithm-chapters">
+          {sections.map((section, index) => {
+            const route = `/wiki/learning/algorithms/${section.slug}/`;
+
+            return (
+              <section className="algorithm-chapter" key={section.slug}>
+                <header className="algorithm-chapter-header">
+                  <span aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <h2>
+                    <Link href={route}>{section.title}</Link>
+                  </h2>
+                  <small>{section.questions.length} 题</small>
+                </header>
+                <ul>
+                  {section.questions.map((question) => (
+                    <li key={question.id}>
+                      <Link href={`${route}#${question.id}`}>
+                        {question.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
         </div>
       </article>
     </main>

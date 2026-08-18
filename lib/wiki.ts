@@ -67,6 +67,12 @@ export type WikiPage = WikiPageSummary & {
   outline: WikiOutlineItem[];
 };
 
+export type AlgorithmCatalogSection = {
+  questions: { id: string; title: string }[];
+  slug: string;
+  title: string;
+};
+
 type WikiDocument = WikiPageSummary & {
   coverSource: string;
   markdown: string;
@@ -101,6 +107,25 @@ export type FragmentPage = {
 
 const wikiLinkCatalogCache = new Map<string, WikiLinkCatalog>();
 const wikiMediaCatalogCache = new Map<string, WikiMediaAsset[]>();
+const ALGORITHM_CATEGORIES = [
+  ["hash", "哈希"],
+  ["two-pointers", "双指针"],
+  ["sliding-window", "滑动窗口"],
+  ["substring", "子串"],
+  ["array", "普通数组"],
+  ["matrix", "矩阵"],
+  ["linked-list", "链表"],
+  ["binary-tree", "二叉树"],
+  ["graph", "图论"],
+  ["backtracking", "回溯"],
+  ["binary-search", "二分查找"],
+  ["stack", "栈"],
+  ["heap", "堆"],
+  ["greedy", "贪心算法"],
+  ["dynamic-programming", "动态规划"],
+  ["multi-dim-dp", "多维动态规划"],
+  ["misc", "其他"],
+] as const;
 
 export function getWikiRoot(): string {
   const configuredPath = process.env.COREPEDIA_WIKI_PATH?.trim();
@@ -112,6 +137,25 @@ export function getWikiRoot(): string {
 
 export function getWikiPages(): WikiPageSummary[] {
   return loadWikiDocuments().map(toPageSummary);
+}
+
+export function getAlgorithmCatalog(): AlgorithmCatalogSection[] {
+  const documents = loadWikiDocuments();
+
+  return ALGORITHM_CATEGORIES.map(([slug, title]) => {
+    const path = `learning/algorithms/${slug}.md`;
+    const document = documents.find((candidate) => candidate.path === path);
+    if (!document) {
+      throw new Error(`Missing algorithm category page: ${path}`);
+    }
+
+    const questions = extractLeetCodeQuestions(document.markdown);
+    if (!questions.length) {
+      throw new Error(`Algorithm category has no LeetCode questions: ${path}`);
+    }
+
+    return { questions, slug, title };
+  });
 }
 
 export function getFragmentPages(): FragmentPage[] {
@@ -970,6 +1014,24 @@ function markdownToSearchText(markdown: string): string {
 
 function createExcerpt(text: string): string {
   return text.length > 180 ? `${text.slice(0, 180).trim()}…` : text;
+}
+
+function extractLeetCodeQuestions(
+  markdown: string,
+): AlgorithmCatalogSection["questions"] {
+  const headings = [...markdown.matchAll(/^##[ \t]+(.+?)\s*$/gm)];
+
+  return headings.flatMap((heading, index) => {
+    const sectionStart = (heading.index ?? 0) + heading[0].length;
+    const sectionEnd = headings[index + 1]?.index ?? markdown.length;
+    const section = markdown.slice(sectionStart, sectionEnd);
+    if (!/https:\/\/leetcode\.cn\/problems\//.test(section)) {
+      return [];
+    }
+
+    const title = heading[1].trim();
+    return [{ id: headingToId(title), title }];
+  });
 }
 
 function headingToId(heading: string): string {
