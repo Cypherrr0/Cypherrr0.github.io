@@ -21,6 +21,10 @@ import remarkRehype from "remark-rehype";
 import { unified, type Plugin } from "unified";
 import { visit } from "unist-util-visit";
 import { artifactMarkdownPlugin } from "@/lib/artifacts";
+import {
+  resolveWikiRouteAlias,
+  WIKI_LEGACY_REDIRECTS,
+} from "@/lib/wiki-legacy-routes";
 
 const PUBLIC_ROOTS = new Set(["learning", "tech", "writing"]);
 const FRONTEND_INDEX_PATHS = new Set([
@@ -145,6 +149,24 @@ export function getWikiPages(): WikiPageSummary[] {
   return loadWikiDocuments().map(toPageSummary);
 }
 
+export function getWikiStaticParamSlugs(): string[][] {
+  const pages = getWikiPages();
+  if (!pages.length) {
+    return [];
+  }
+
+  const slugs = pages.map((page) => page.slug);
+  const published = new Set(pages.map((page) => page.slug.join("/")));
+
+  for (const [from, to] of Object.entries(WIKI_LEGACY_REDIRECTS)) {
+    if (published.has(to) && !published.has(from)) {
+      slugs.push(from.split("/"));
+    }
+  }
+
+  return slugs;
+}
+
 export function getAlgorithmCatalog(): AlgorithmCatalogSection[] {
   const documents = loadWikiDocuments();
 
@@ -223,11 +245,13 @@ export function getWikiMediaAsset(fileName: string): WikiMediaAsset | null {
   );
 }
 
+export { getWikiLegacyRedirect } from "@/lib/wiki-legacy-routes";
+
 export async function getWikiPageBySlug(
   slug: string[],
 ): Promise<WikiPage | null> {
   const documents = loadWikiDocuments();
-  const route = slug.join("/");
+  const route = resolveWikiRouteAlias(slug.join("/"));
   const document = documents.find((candidate) => candidate.slug.join("/") === route);
 
   if (!document) {
@@ -515,6 +539,20 @@ function wikiTargetForPath(relativePath: string): string {
   return segments.join("/");
 }
 
+function resolvePublishedWikiTarget(
+  target: string,
+  publishedRoutes: Set<string>,
+): string | null {
+  const aliased = resolveWikiRouteAlias(target);
+  if (publishedRoutes.has(aliased)) {
+    return aliased;
+  }
+  if (publishedRoutes.has(target)) {
+    return target;
+  }
+  return null;
+}
+
 function normalizeWikiTarget(target: string): string | null {
   const normalized = target
     .trim()
@@ -701,17 +739,21 @@ function replaceWikiLinks(
     const label = match[3]?.trim() || target?.split("/").at(-1) || match[1];
     const isEmbed = match[0].startsWith("!");
 
-    if (!isEmbed && target && linkContext.publishedRoutes.has(target)) {
+    const publishedTarget = target
+      ? resolvePublishedWikiTarget(target, linkContext.publishedRoutes)
+      : null;
+
+    if (!isEmbed && publishedTarget) {
       const link: Link = {
         children: [{ type: "text", value: label }],
         data: {
           hProperties: {
             className: ["wiki-link", "wiki-link-internal"],
-            title: `内部页面：${target}`,
+            title: `内部页面：${publishedTarget}`,
           },
         },
         type: "link",
-        url: `/wiki/${target}/${heading ? `#${headingToId(heading)}` : ""}`,
+        url: `/wiki/${publishedTarget}/${heading ? `#${headingToId(heading)}` : ""}`,
       };
       replacements.push(link);
     } else if (

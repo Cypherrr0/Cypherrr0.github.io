@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArticleOutline } from "@/components/article-outline";
 import {
   getAlgorithmCatalog,
+  getWikiLegacyRedirect,
   getWikiPageBySlug,
   getWikiPages,
+  getWikiStaticParamSlugs,
   type AlgorithmCatalogSection,
 } from "@/lib/wiki";
 import { buildWikiNavigationPages } from "@/lib/wiki-navigation";
@@ -25,10 +27,10 @@ type WikiPageProps = {
 };
 
 export function generateStaticParams() {
-  const pages = getWikiPages();
+  const slugs = getWikiStaticParamSlugs();
 
-  return pages.length
-    ? pages.map((page) => ({ slug: page.slug }))
+  return slugs.length
+    ? slugs.map((slug) => ({ slug }))
     : [{ slug: UNAVAILABLE_SLUG }];
 }
 
@@ -36,6 +38,10 @@ export async function generateMetadata({
   params,
 }: WikiPageProps): Promise<Metadata> {
   const { slug } = await params;
+  const legacyTarget = getWikiLegacyRedirect(slug);
+  if (legacyTarget) {
+    redirect(`/wiki/${legacyTarget}/`);
+  }
   const page = await getWikiPageBySlug(slug);
 
   if (!page) {
@@ -64,6 +70,10 @@ export async function generateMetadata({
 
 export default async function WikiPage({ params }: WikiPageProps) {
   const { slug } = await params;
+  const legacyTarget = getWikiLegacyRedirect(slug);
+  if (legacyTarget) {
+    redirect(`/wiki/${legacyTarget}/`);
+  }
   const page = await getWikiPageBySlug(slug);
 
   if (!page) {
