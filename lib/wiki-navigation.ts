@@ -1,37 +1,37 @@
 import type { WikiPageSummary } from "@/lib/wiki";
 
-const LEETCODE_INDEX_PATH = "learning/algorithms/index.md";
 const LEETCODE_PATH_PREFIX = "learning/algorithms/";
 
 export function buildWikiNavigationPages(
   pages: WikiPageSummary[],
 ): WikiPageSummary[] {
-  const leetCodePages = pages.filter(
-    (page) =>
-      page.path.startsWith(LEETCODE_PATH_PREFIX) &&
-      page.path !== LEETCODE_INDEX_PATH,
+  const leetCodePages = pages.filter((page) =>
+    page.path.startsWith(LEETCODE_PATH_PREFIX),
   );
   const latestLeetCodeUpdate = leetCodePages.reduce(
     (latest, page) => (page.updated > latest ? page.updated : latest),
     "",
   );
 
-  return pages
-    .filter(
-      (page) =>
-        page.path === LEETCODE_INDEX_PATH ||
-        (!isIndexPage(page) && !page.path.startsWith(LEETCODE_PATH_PREFIX)),
-    )
-    .map((page) =>
-      page.path === LEETCODE_INDEX_PATH
-        ? {
-            ...page,
-            title: "LeetCode 热题 100",
-            updated: latestLeetCodeUpdate || page.updated,
-          }
-        : page,
-    )
-    .sort(comparePagesByUpdated);
+  const navigationPages = pages.filter(
+    (page) => !isIndexPage(page) && !page.path.startsWith(LEETCODE_PATH_PREFIX),
+  );
+
+  if (leetCodePages.length) {
+    navigationPages.push({
+      excerpt: "",
+      path: "learning/algorithms/",
+      searchText: "LeetCode 热题 100",
+      slug: ["learning", "algorithms"],
+      status: "",
+      tags: [],
+      title: "LeetCode 热题 100",
+      type: "",
+      updated: latestLeetCodeUpdate,
+    });
+  }
+
+  return navigationPages.sort(comparePagesByUpdated);
 }
 
 export function isIndexPage(page: WikiPageSummary): boolean {

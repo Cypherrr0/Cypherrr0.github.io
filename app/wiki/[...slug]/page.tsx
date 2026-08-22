@@ -5,11 +5,13 @@ import { notFound, redirect } from "next/navigation";
 import { ArticleOutline } from "@/components/article-outline";
 import {
   getAlgorithmCatalog,
+  getWikiDirectoryListing,
   getWikiLegacyRedirect,
   getWikiPageBySlug,
   getWikiPages,
   getWikiStaticParamSlugs,
   type AlgorithmCatalogSection,
+  type WikiDirectoryListing,
 } from "@/lib/wiki";
 import { buildWikiNavigationPages } from "@/lib/wiki-navigation";
 
@@ -42,11 +44,6 @@ export async function generateMetadata({
   if (legacyTarget) {
     redirect(`/wiki/${legacyTarget}/`);
   }
-  const page = await getWikiPageBySlug(slug);
-
-  if (!page) {
-    return {};
-  }
 
   if (slug.length === 1 && DOMAIN_TITLES[slug[0]]) {
     return {
@@ -62,10 +59,23 @@ export async function generateMetadata({
     };
   }
 
-  return {
-    description: page.excerpt,
-    title: page.title,
-  };
+  const page = await getWikiPageBySlug(slug);
+  if (page) {
+    return {
+      description: page.excerpt,
+      title: page.title,
+    };
+  }
+
+  const listing = getWikiDirectoryListing(slug);
+  if (listing) {
+    return {
+      description: `${listing.title}目录。`,
+      title: listing.title,
+    };
+  }
+
+  return {};
 }
 
 export default async function WikiPage({ params }: WikiPageProps) {
@@ -74,43 +84,41 @@ export default async function WikiPage({ params }: WikiPageProps) {
   if (legacyTarget) {
     redirect(`/wiki/${legacyTarget}/`);
   }
-  const page = await getWikiPageBySlug(slug);
-
-  if (!page) {
-    if (slug.join("/") === UNAVAILABLE_SLUG.join("/") && !getWikiPages().length) {
-      return (
-        <main className="article-shell" id="main-content" tabIndex={-1}>
-          <nav aria-label="面包屑" className="breadcrumbs">
-            <Link href="/">C/P</Link>
-            <span aria-hidden="true">/</span>
-            <Link href="/wiki/">Wiki</Link>
-          </nav>
-          <section className="empty-state">
-            <h1>Wiki 内容尚未接入</h1>
-            <p>
-              构建时设置 <code>COREPEDIA_WIKI_PATH</code> 指向 Corepedia 的
-              <code>wikis</code> 目录即可生成公开页面。
-            </p>
-          </section>
-        </main>
-      );
-    }
-
-    notFound();
+  if (slug.join("/") === UNAVAILABLE_SLUG.join("/") && !getWikiPages().length) {
+    return (
+      <main className="article-shell" id="main-content" tabIndex={-1}>
+        <nav aria-label="面包屑" className="breadcrumbs">
+          <Link href="/">C/P</Link>
+          <span aria-hidden="true">/</span>
+          <Link href="/wiki/">Wiki</Link>
+        </nav>
+        <section className="empty-state">
+          <h1>Wiki 内容尚未接入</h1>
+          <p>
+            构建时设置 <code>COREPEDIA_WIKI_PATH</code> 指向 Corepedia 的
+            <code>wikis</code> 目录即可生成公开页面。
+          </p>
+        </section>
+      </main>
+    );
   }
 
   if (slug.length === 1 && DOMAIN_TITLES[slug[0]]) {
     const domainPages = buildWikiNavigationPages(getWikiPages()).filter(
       (candidate) => candidate.slug[0] === slug[0],
     );
-    return <DomainIndex domain={slug[0]} pages={domainPages} />;
+    if (domainPages.length) {
+      return <DomainIndex domain={slug[0]} pages={domainPages} />;
+    }
   }
 
   if (slug.join("/") === ALGORITHM_INDEX_ROUTE) {
     return <AlgorithmIndex sections={getAlgorithmCatalog()} />;
   }
 
-  return (
+  const page = await getWikiPageBySlug(slug);
+  if (page) {
+    return (
     <main className="article-shell" id="main-content" tabIndex={-1}>
       <nav aria-label="面包屑" className="breadcrumbs">
         <Link href="/">C/P</Link>
@@ -193,7 +201,98 @@ export default async function WikiPage({ params }: WikiPageProps) {
         </div>
       </article>
     </main>
+    );
+  }
+
+  const listing = getWikiDirectoryListing(slug);
+  if (listing) {
+    return <DirectoryIndex listing={listing} />;
+  }
+
+  notFound();
+}
+
+function DirectoryIndex({ listing }: { listing: WikiDirectoryListing }) {
+  const childCount = listing.directories.length + listing.pages.length;
+
+  return (
+    <main className="article-shell" id="main-content" tabIndex={-1}>
+      <nav aria-label="面包屑" className="breadcrumbs">
+        <Link href="/">C/P</Link>
+        <span aria-hidden="true">/</span>
+        <Link href="/wiki/">Wiki</Link>
+        {listing.slug.map((segment, index) => {
+          const href = `/wiki/${listing.slug.slice(0, index + 1).join("/")}/`;
+          const label = index === 0 ? segment : formatDirectoryLabel(segment);
+          const isLast = index === listing.slug.length - 1;
+
+          return (
+            <span key={href}>
+              <span aria-hidden="true">/</span>
+              {isLast ? <span>{label}</span> : <Link href={href}>{label}</Link>}
+            </span>
+          );
+        })}
+      </nav>
+
+      <article className="wiki-article">
+        <header className="article-header">
+          <div className="article-header-copy">
+            <p className="eyebrow">Corepedia / Directory</p>
+            <h1>{listing.title}</h1>
+          </div>
+        </header>
+
+        <div className="article-grid">
+          <aside className="article-rail" aria-label="目录信息">
+            <div className="article-rail-meta">
+              <span>{listing.slug.join(" / ")}</span>
+              <span>{childCount} entries</span>
+            </div>
+          </aside>
+          <div className="article-main">
+            {listing.directories.length ? (
+              <div className="topic-pages">
+                <h2>子目录</h2>
+                <ul>
+                  {listing.directories.map((directory) => (
+                    <li key={directory.href}>
+                      <Link href={directory.href}>{directory.title}</Link>
+                      <span>{directory.pageCount}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {listing.pages.length ? (
+              <div className="topic-pages">
+                <h2>本层页面</h2>
+                <ul>
+                  {listing.pages.map((item) => (
+                    <li key={item.path}>
+                      <Link href={`/wiki/${item.slug.join("/")}/`}>
+                        {item.title}
+                      </Link>
+                      {item.updated ? (
+                        <time dateTime={item.updated}>{item.updated}</time>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </article>
+    </main>
   );
+}
+
+function formatDirectoryLabel(segment: string) {
+  return segment
+    .split("-")
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
 }
 
 function DomainIndex({

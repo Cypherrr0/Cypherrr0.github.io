@@ -27,13 +27,6 @@ import {
 } from "@/lib/wiki-legacy-routes";
 
 const PUBLIC_ROOTS = new Set(["learning", "tech", "writing"]);
-const FRONTEND_INDEX_PATHS = new Set([
-  "learning/index.md",
-  "learning/algorithms/index.md",
-  "tech/index.md",
-  "writing/index.md",
-]);
-const PRODUCT_HUB_INDEX_PREFIX = "tech/llm/agent-harness/";
 const FRAGMENT_ROOT = "fragments";
 const WIKI_LINK_PATTERN =
   /!?\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g;
@@ -64,6 +57,20 @@ export type WikiPageSummary = {
   title: string;
   type: string;
   updated: string;
+};
+
+export type WikiDirectoryChild = {
+  href: string;
+  pageCount: number;
+  segment: string;
+  title: string;
+};
+
+export type WikiDirectoryListing = {
+  directories: WikiDirectoryChild[];
+  pages: WikiPageSummary[];
+  slug: string[];
+  title: string;
 };
 
 export type WikiOutlineItem = {
@@ -156,16 +163,87 @@ export function getWikiStaticParamSlugs(): string[][] {
     return [];
   }
 
-  const slugs = pages.map((page) => page.slug);
-  const published = new Set(pages.map((page) => page.slug.join("/")));
+  const seen = new Set<string>();
+  const slugs: string[][] = [];
+
+  const add = (parts: string[]) => {
+    const route = parts.join("/");
+    if (!route || seen.has(route)) {
+      return;
+    }
+    seen.add(route);
+    slugs.push(parts);
+  };
+
+  for (const page of pages) {
+    add(page.slug);
+    for (const prefix of directoryPrefixes(page.slug)) {
+      add(prefix);
+    }
+  }
 
   for (const [from, to] of Object.entries(WIKI_LEGACY_REDIRECTS)) {
-    if (published.has(to) && !published.has(from)) {
-      slugs.push(from.split("/"));
+    if (seen.has(to) && !seen.has(from)) {
+      add(from.split("/"));
     }
   }
 
   return slugs;
+}
+
+export function getWikiDirectoryListing(
+  slug: string[],
+): WikiDirectoryListing | null {
+  if (!slug.length) {
+    return null;
+  }
+
+  const prefix = slug.join("/");
+  const descendants = getWikiPages().filter(
+    (page) =>
+      page.slug.length > slug.length &&
+      page.slug.slice(0, slug.length).join("/") === prefix,
+  );
+  if (!descendants.length) {
+    return null;
+  }
+
+  const directories = new Map<string, WikiDirectoryChild>();
+  const pages: WikiPageSummary[] = [];
+
+  for (const page of descendants) {
+    const segment = page.slug[slug.length];
+    if (page.slug.length === slug.length + 1) {
+      pages.push(page);
+      continue;
+    }
+
+    const childPrefix = [...slug, segment];
+    const href = `/wiki/${childPrefix.join("/")}/`;
+    const existing = directories.get(segment);
+    if (existing) {
+      existing.pageCount += 1;
+      continue;
+    }
+
+    directories.set(segment, {
+      href,
+      pageCount: 1,
+      segment,
+      title: formatWikiSlugSegment(segment),
+    });
+  }
+
+  return {
+    directories: [...directories.values()].sort((left, right) =>
+      left.title.localeCompare(right.title, "zh-CN"),
+    ),
+    pages: pages.sort((left, right) =>
+      left.title.localeCompare(right.title, "zh-CN"),
+    ),
+    slug,
+    title: formatWikiSlugSegment(slug.at(-1) || prefix),
+  };
 }
 
 export function getAlgorithmCatalog(): AlgorithmCatalogSection[] {
@@ -261,8 +339,8 @@ export async function getWikiPageBySlug(
 
   const linkContext: WikiLinkContext = {
     ...getWikiLinkCatalog(),
-    publishedRoutes: new Set(
-      documents.map((candidate) => candidate.slug.join("/")),
+    publishedRoutes: publishedWikiRoutes(
+      documents.map((candidate) => candidate.slug),
     ),
   };
   const { html, outline } = await renderMarkdown(
@@ -417,7 +495,7 @@ function parseWikiDocument(
   if (!PUBLIC_ROOTS.has(root)) {
     return null;
   }
-  if (relativePath.endsWith("/index.md") && !isRoutableIndexPage(relativePath)) {
+  if (path.basename(relativePath) === "index.md") {
     return null;
   }
 
@@ -522,15 +600,30 @@ function assertFragmentIsolation(wikiRoot: string): void {
   }
 }
 
-function isRoutableIndexPage(relativePath: string): boolean {
-  if (FRONTEND_INDEX_PATHS.has(relativePath)) {
-    return true;
+function directoryPrefixes(slug: string[]): string[][] {
+  const prefixes: string[][] = [];
+  for (let length = 1; length < slug.length; length += 1) {
+    prefixes.push(slug.slice(0, length));
   }
+  return prefixes;
+}
 
-  return (
-    relativePath.startsWith(PRODUCT_HUB_INDEX_PREFIX) &&
-    relativePath.endsWith("/index.md")
-  );
+function publishedWikiRoutes(slugs: string[][]): Set<string> {
+  const routes = new Set<string>();
+  for (const slug of slugs) {
+    routes.add(slug.join("/"));
+    for (const prefix of directoryPrefixes(slug)) {
+      routes.add(prefix.join("/"));
+    }
+  }
+  return routes;
+}
+
+function formatWikiSlugSegment(segment: string): string {
+  return segment
+    .split("-")
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
 }
 
 function routeSlugForPath(relativePath: string): string[] {
