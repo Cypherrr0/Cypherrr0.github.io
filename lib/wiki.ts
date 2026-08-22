@@ -33,6 +33,7 @@ const FRONTEND_INDEX_PATHS = new Set([
   "tech/index.md",
   "writing/index.md",
 ]);
+const PRODUCT_HUB_INDEX_PREFIX = "tech/llm/agent-harness/";
 const FRAGMENT_ROOT = "fragments";
 const WIKI_LINK_PATTERN =
   /!?\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g;
@@ -416,10 +417,7 @@ function parseWikiDocument(
   if (!PUBLIC_ROOTS.has(root)) {
     return null;
   }
-  if (
-    relativePath.endsWith("/index.md") &&
-    !FRONTEND_INDEX_PATHS.has(relativePath)
-  ) {
+  if (relativePath.endsWith("/index.md") && !isRoutableIndexPage(relativePath)) {
     return null;
   }
 
@@ -522,6 +520,17 @@ function assertFragmentIsolation(wikiRoot: string): void {
       );
     }
   }
+}
+
+function isRoutableIndexPage(relativePath: string): boolean {
+  if (FRONTEND_INDEX_PATHS.has(relativePath)) {
+    return true;
+  }
+
+  return (
+    relativePath.startsWith(PRODUCT_HUB_INDEX_PREFIX) &&
+    relativePath.endsWith("/index.md")
+  );
 }
 
 function routeSlugForPath(relativePath: string): string[] {
