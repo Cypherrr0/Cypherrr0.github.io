@@ -1214,8 +1214,30 @@ code {
   margin: 1.15rem 0;
 }
 
+.wiki-content ul,
+.wiki-content ol {
+  padding-left: 1.5rem;
+}
+
+.wiki-content ul {
+  list-style: disc;
+}
+
+.wiki-content ol {
+  list-style: decimal;
+}
+
 .wiki-content li + li {
   margin-top: 0.35rem;
+}
+
+.wiki-content li > ul,
+.wiki-content li > ol {
+  margin: 0.35rem 0;
+}
+
+.wiki-content ul ul {
+  list-style: circle;
 }
 
 .wiki-content blockquote {
