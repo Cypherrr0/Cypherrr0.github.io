@@ -1290,6 +1290,34 @@ code {
   outline-offset: 3px;
 }
 
+.wiki-content .wiki-footnote-ref {
+  color: var(--muted);
+  font-size: 0.68em;
+  font-weight: 560;
+  line-height: 0;
+  margin-left: 0.12em;
+  text-decoration: none;
+  vertical-align: super;
+}
+
+.wiki-content .wiki-footnote-ref:hover,
+.wiki-content .wiki-footnote-ref:focus-visible {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.12em;
+}
+
+.wiki-content .wiki-footnote-list > li {
+  scroll-margin-top: 6rem;
+}
+
+.wiki-content .wiki-footnote-list > li:target {
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  outline: 1px solid var(--border-strong);
+  outline-offset: 0.35rem;
+}
+
 .wiki-content .wiki-link-internal::before {
   content: "→";
   display: inline-block;

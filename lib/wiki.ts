@@ -923,6 +923,7 @@ async function renderMarkdown(
     .use(rehypeKatex)
     .use(rehypeHighlight, { detect: true })
     .use(linkMetadataPlugin())
+    .use(footnoteRefPlugin())
     .use(mediaStatusPlugin())
     .use(rehypeSlug)
     .use(outlinePlugin(outline))
@@ -1064,6 +1065,103 @@ function protectWikiLinkPipesInTables(markdown: string): string {
       );
     })
     .join("\n");
+}
+
+const FOOTNOTE_MARKER = /^\[(\d{1,3})\]$/;
+const REFERENCE_HEADING = /^(参考来源|参考文献|参考)$/;
+
+function classNames(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(String);
+  }
+  if (typeof value === "string") {
+    return value.split(/\s+/).filter(Boolean);
+  }
+  return [];
+}
+
+function footnoteRefPlugin(): Plugin<[], import("hast").Root> {
+  return () => (tree) => {
+    const refs: Array<{ node: import("hast").Element; n: string }> = [];
+
+    visit(tree, "element", (node) => {
+      if (node.tagName !== "a") {
+        return;
+      }
+      const match = FOOTNOTE_MARKER.exec(hastText(node).trim());
+      if (!match) {
+        return;
+      }
+      refs.push({ n: match[1], node });
+    });
+
+    if (!refs.length) {
+      return;
+    }
+
+    const listed = new Set<string>();
+    visit(tree, "element", (node, index, parent) => {
+      if (!/^h[1-6]$/.test(node.tagName)) {
+        return;
+      }
+      if (!REFERENCE_HEADING.test(hastText(node).trim())) {
+        return;
+      }
+      if (!parent || typeof index !== "number") {
+        return;
+      }
+
+      let nextIndex = index + 1;
+      while (nextIndex < parent.children.length) {
+        const candidate = parent.children[nextIndex];
+        if (candidate.type === "text" && !String(candidate.value).trim()) {
+          nextIndex += 1;
+          continue;
+        }
+        break;
+      }
+      const next = parent.children[nextIndex];
+      if (!next || next.type !== "element" || next.tagName !== "ol") {
+        return;
+      }
+
+      next.properties = next.properties ?? {};
+      next.properties.className = [
+        ...classNames(next.properties.className),
+        "wiki-footnote-list",
+      ];
+
+      let ordinal = 0;
+      for (const child of next.children) {
+        if (child.type !== "element" || child.tagName !== "li") {
+          continue;
+        }
+        ordinal += 1;
+        const id = `fn-${ordinal}`;
+        child.properties = child.properties ?? {};
+        child.properties.id = id;
+        listed.add(String(ordinal));
+      }
+    });
+
+    const seen = new Map<string, number>();
+    for (const { node, n } of refs) {
+      const count = (seen.get(n) ?? 0) + 1;
+      seen.set(n, count);
+      node.children = [{ type: "text", value: n }];
+      node.properties.className = ["wiki-footnote-ref"];
+      node.properties["aria-label"] = `参考 ${n}`;
+      if (listed.has(n)) {
+        node.properties.href = `#fn-${n}`;
+        delete node.properties.target;
+        delete node.properties.rel;
+        node.properties.title = `跳转到参考 ${n}`;
+      }
+      if (count === 1) {
+        node.properties.id = `fnref-${n}`;
+      }
+    }
+  };
 }
 
 function linkMetadataPlugin(): Plugin<[], import("hast").Root> {
