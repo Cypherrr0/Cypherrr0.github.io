@@ -9,13 +9,10 @@ import {
   getWikiLegacyRedirect,
   getWikiPageBySlug,
   getWikiPages,
-  getWikiPinnedEntries,
   getWikiStaticParamSlugs,
   type AlgorithmCatalogSection,
   type WikiDirectoryListing,
-  type WikiPinnedEntry,
 } from "@/lib/wiki";
-import { buildWikiNavigationPages } from "@/lib/wiki-navigation";
 
 export const dynamicParams = false;
 const UNAVAILABLE_SLUG = ["unavailable"];
@@ -106,11 +103,11 @@ export default async function WikiPage({ params }: WikiPageProps) {
   }
 
   if (slug.length === 1 && DOMAIN_TITLES[slug[0]]) {
-    const domainPages = buildWikiNavigationPages(getWikiPages()).filter(
-      (candidate) => candidate.slug[0] === slug[0],
-    );
-    if (domainPages.length) {
-      return <DomainIndex domain={slug[0]} pages={domainPages} />;
+    const listing = getWikiDirectoryListing(slug);
+    if (listing) {
+      return (
+        <DirectoryIndex listing={listing} title={DOMAIN_TITLES[slug[0]]} />
+      );
     }
   }
 
@@ -214,19 +211,14 @@ export default async function WikiPage({ params }: WikiPageProps) {
   notFound();
 }
 
-function DirectoryIndex({ listing }: { listing: WikiDirectoryListing }) {
+function DirectoryIndex({
+  listing,
+  title,
+}: {
+  listing: WikiDirectoryListing;
+  title?: string;
+}) {
   const childCount = listing.directories.length + listing.pages.length;
-  const pinnedEntries = getWikiPinnedEntries(listing.slug);
-  const pinnedHrefs = new Set(pinnedEntries.map((entry) => entry.href));
-  const directories = listing.directories.filter(
-    (directory) => !pinnedHrefs.has(directory.href),
-  );
-  const pinnedPageCounts = new Map(
-    listing.directories.map((directory) => [
-      directory.href,
-      directory.pageCount,
-    ]),
-  );
 
   return (
     <main className="article-shell" id="main-content" tabIndex={-1}>
@@ -242,7 +234,7 @@ function DirectoryIndex({ listing }: { listing: WikiDirectoryListing }) {
           return (
             <span key={href}>
               <span aria-hidden="true">/</span>
-              {isLast ? <span>{label}</span> : <Link href={href}>{label}</Link>}
+              {isLast ? <span>{title ?? label}</span> : <Link href={href}>{label}</Link>}
             </span>
           );
         })}
@@ -252,7 +244,7 @@ function DirectoryIndex({ listing }: { listing: WikiDirectoryListing }) {
         <header className="article-header">
           <div className="article-header-copy">
             <p className="eyebrow">Corepedia / Directory</p>
-            <h1>{listing.title}</h1>
+            <h1>{title ?? listing.title}</h1>
           </div>
         </header>
 
@@ -264,17 +256,11 @@ function DirectoryIndex({ listing }: { listing: WikiDirectoryListing }) {
             </div>
           </aside>
           <div className="article-main">
-            {pinnedEntries.length ? (
-              <PinnedEntries
-                entries={pinnedEntries}
-                pageCounts={pinnedPageCounts}
-              />
-            ) : null}
-            {directories.length ? (
+            {listing.directories.length ? (
               <div className="topic-pages">
                 <h2>子目录</h2>
                 <ul>
-                  {directories.map((directory) => (
+                  {listing.directories.map((directory) => (
                     <li key={directory.href}>
                       <Link href={directory.href}>{directory.title}</Link>
                       <span>{directory.pageCount}</span>
@@ -307,95 +293,11 @@ function DirectoryIndex({ listing }: { listing: WikiDirectoryListing }) {
   );
 }
 
-function PinnedEntries({
-  entries,
-  pageCounts,
-}: {
-  entries: WikiPinnedEntry[];
-  pageCounts?: Map<string, number>;
-}) {
-  return (
-    <div className="topic-pages pinned-entries">
-      <h2>固定入口</h2>
-      <ul>
-        {entries.map((entry) => (
-          <li key={entry.href}>
-            <Link href={entry.href}>{entry.title}</Link>
-            {pageCounts?.get(entry.href) ? (
-              <span>{pageCounts.get(entry.href)}</span>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function formatDirectoryLabel(segment: string) {
   return segment
     .split("-")
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
     .join(" ");
-}
-
-function DomainIndex({
-  domain,
-  pages,
-}: {
-  domain: string;
-  pages: ReturnType<typeof getWikiPages>;
-}) {
-  const title = DOMAIN_TITLES[domain] || domain;
-  const pinnedEntries = getWikiPinnedEntries([domain]);
-
-  return (
-    <main className="article-shell" id="main-content" tabIndex={-1}>
-      <nav aria-label="面包屑" className="breadcrumbs">
-        <Link href="/">C/P</Link>
-        <span aria-hidden="true">/</span>
-        <Link href="/wiki/">Wiki</Link>
-        <span aria-hidden="true">/</span>
-        <span>{domain}</span>
-      </nav>
-
-      <article className="wiki-article">
-        <header className="article-header">
-          <div className="article-header-copy">
-            <p className="eyebrow">Corepedia / Domain</p>
-            <h1>{title}</h1>
-          </div>
-        </header>
-
-        <div className="article-grid">
-          <aside className="article-rail" aria-label="目录信息">
-            <div className="article-rail-meta">
-              <span>{domain}</span>
-              <span>{pages.length} pages</span>
-            </div>
-          </aside>
-          <div className="article-main">
-            {pinnedEntries.length ? (
-              <PinnedEntries entries={pinnedEntries} />
-            ) : null}
-            <div className="topic-pages">
-              <ul>
-                {pages.map((item) => (
-                  <li key={item.path}>
-                    <Link href={`/wiki/${item.slug.join("/")}/`}>
-                      {item.title}
-                    </Link>
-                    {item.updated ? (
-                      <time dateTime={item.updated}>{item.updated}</time>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </article>
-    </main>
-  );
 }
 
 function AlgorithmIndex({ sections }: { sections: AlgorithmCatalogSection[] }) {

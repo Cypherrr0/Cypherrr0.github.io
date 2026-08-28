@@ -214,14 +214,6 @@ code {
   margin-top: 1.25rem;
 }
 
-.topic-pages + .topic-pages {
-  margin-top: 1.25rem;
-}
-
-.pinned-entries li a {
-  font-weight: 700;
-}
-
 .topic-label {
   color: var(--muted);
   font-size: 0.8rem;
