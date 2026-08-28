@@ -246,6 +246,33 @@ export function getWikiDirectoryListing(
   };
 }
 
+export type WikiPinnedEntry = {
+  href: string;
+  title: string;
+};
+
+const PINNED_DIRECTORY_ENTRIES: Record<string, WikiPinnedEntry[]> = {
+  tech: [{ href: "/wiki/tech/llm/", title: "LLM" }],
+  "tech/llm": [
+    { href: "/wiki/tech/llm/agent-harness/", title: "Agent Harness" },
+  ],
+};
+
+export function getWikiPinnedEntries(slug: string[]): WikiPinnedEntry[] {
+  const entries = PINNED_DIRECTORY_ENTRIES[slug.join("/")];
+  if (!entries?.length) {
+    return [];
+  }
+
+  const published = publishedWikiRoutes(
+    getWikiPages().map((page) => page.slug),
+  );
+
+  return entries.filter((entry) =>
+    published.has(entry.href.replace(/^\/wiki\//, "").replace(/\/$/, "")),
+  );
+}
+
 export function getAlgorithmCatalog(): AlgorithmCatalogSection[] {
   const documents = loadWikiDocuments();
 

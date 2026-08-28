@@ -9,9 +9,11 @@ import {
   getWikiLegacyRedirect,
   getWikiPageBySlug,
   getWikiPages,
+  getWikiPinnedEntries,
   getWikiStaticParamSlugs,
   type AlgorithmCatalogSection,
   type WikiDirectoryListing,
+  type WikiPinnedEntry,
 } from "@/lib/wiki";
 import { buildWikiNavigationPages } from "@/lib/wiki-navigation";
 
@@ -214,6 +216,17 @@ export default async function WikiPage({ params }: WikiPageProps) {
 
 function DirectoryIndex({ listing }: { listing: WikiDirectoryListing }) {
   const childCount = listing.directories.length + listing.pages.length;
+  const pinnedEntries = getWikiPinnedEntries(listing.slug);
+  const pinnedHrefs = new Set(pinnedEntries.map((entry) => entry.href));
+  const directories = listing.directories.filter(
+    (directory) => !pinnedHrefs.has(directory.href),
+  );
+  const pinnedPageCounts = new Map(
+    listing.directories.map((directory) => [
+      directory.href,
+      directory.pageCount,
+    ]),
+  );
 
   return (
     <main className="article-shell" id="main-content" tabIndex={-1}>
@@ -251,11 +264,17 @@ function DirectoryIndex({ listing }: { listing: WikiDirectoryListing }) {
             </div>
           </aside>
           <div className="article-main">
-            {listing.directories.length ? (
+            {pinnedEntries.length ? (
+              <PinnedEntries
+                entries={pinnedEntries}
+                pageCounts={pinnedPageCounts}
+              />
+            ) : null}
+            {directories.length ? (
               <div className="topic-pages">
                 <h2>子目录</h2>
                 <ul>
-                  {listing.directories.map((directory) => (
+                  {directories.map((directory) => (
                     <li key={directory.href}>
                       <Link href={directory.href}>{directory.title}</Link>
                       <span>{directory.pageCount}</span>
@@ -288,6 +307,30 @@ function DirectoryIndex({ listing }: { listing: WikiDirectoryListing }) {
   );
 }
 
+function PinnedEntries({
+  entries,
+  pageCounts,
+}: {
+  entries: WikiPinnedEntry[];
+  pageCounts?: Map<string, number>;
+}) {
+  return (
+    <div className="topic-pages pinned-entries">
+      <h2>固定入口</h2>
+      <ul>
+        {entries.map((entry) => (
+          <li key={entry.href}>
+            <Link href={entry.href}>{entry.title}</Link>
+            {pageCounts?.get(entry.href) ? (
+              <span>{pageCounts.get(entry.href)}</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function formatDirectoryLabel(segment: string) {
   return segment
     .split("-")
@@ -303,6 +346,7 @@ function DomainIndex({
   pages: ReturnType<typeof getWikiPages>;
 }) {
   const title = DOMAIN_TITLES[domain] || domain;
+  const pinnedEntries = getWikiPinnedEntries([domain]);
 
   return (
     <main className="article-shell" id="main-content" tabIndex={-1}>
@@ -330,6 +374,9 @@ function DomainIndex({
             </div>
           </aside>
           <div className="article-main">
+            {pinnedEntries.length ? (
+              <PinnedEntries entries={pinnedEntries} />
+            ) : null}
             <div className="topic-pages">
               <ul>
                 {pages.map((item) => (
