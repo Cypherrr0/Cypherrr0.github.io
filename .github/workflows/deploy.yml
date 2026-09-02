@@ -50,14 +50,14 @@ jobs:
           path: corepedia
           sparse-checkout: |
             wikis
-            .trae/skills/corepedia-h5-artifact/references
+            .agents/skills/corepedia-h5-artifact/references
           persist-credentials: false
 
       - name: Verify Corepedia content
         run: |
           test -f corepedia/wikis/index.md
-          test -f corepedia/.trae/skills/corepedia-h5-artifact/references/lieflat-palettes.json
-          test -f corepedia/.trae/skills/corepedia-h5-artifact/references/runtime-registry.json
+          test -f corepedia/.agents/skills/corepedia-h5-artifact/references/lieflat-palettes.json
+          test -f corepedia/.agents/skills/corepedia-h5-artifact/references/runtime-registry.json
           find corepedia/wikis/tech corepedia/wikis/writing corepedia/wikis/learning \
             -type f -name '*.md' -print -quit | grep -q .
 
