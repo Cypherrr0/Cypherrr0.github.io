@@ -14,7 +14,7 @@ const wikiRoot = configuredWiki
 const registryPath = path.resolve(
   wikiRoot,
   "..",
-  ".trae",
+  ".agents",
   "skills",
   "corepedia-h5-artifact",
   "references",

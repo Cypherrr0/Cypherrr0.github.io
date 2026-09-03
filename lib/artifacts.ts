@@ -802,7 +802,7 @@ function loadLieflatRegistry(): LieflatRegistry {
   const registryPath = path.join(
     getWikiRoot(),
     "..",
-    ".trae",
+    ".agents",
     "skills",
     "corepedia-h5-artifact",
     "references",
@@ -840,7 +840,7 @@ function loadSourceFigureRegistry(): Record<
   const registryPath = path.join(
     getWikiRoot(),
     "..",
-    ".trae",
+    ".agents",
     "skills",
     "corepedia-h5-artifact",
     "references",
@@ -938,7 +938,7 @@ function loadRuntimeRegistry(): RuntimeRegistry {
   const registryPath = path.join(
     getWikiRoot(),
     "..",
-    ".trae",
+    ".agents",
     "skills",
     "corepedia-h5-artifact",
     "references",
